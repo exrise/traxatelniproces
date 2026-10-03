@@ -31,11 +31,14 @@ func buildFields(c *balance.Config) []fld {
 		f = append(f, fld{sect, label, func() float64 { return float64(*p) }, func(v float64) { *p = int(math.Round(v)) }, step, min, max, false})
 	}
 	const g = "Общие правила"
+	inum(g, "Внезапная смерть с боя № (0 = нет)", &c.SuddenDeathBattle, 1, 0, 30)
+	num(g, "Урон штабу от внезапной смерти", &c.SuddenDeathDmg, 5, 0, 500)
 	inum(g, "Стартовые деньги", &c.StartMoney, 100, 300, 20000)
 	inum(g, "Доход за каждую стройку", &c.BaseIncome, 50, 0, 5000)
 	num(g, "Время 1-й стройки, с", &c.BuildTimeFirst, 15, 20, 600)
 	num(g, "Время стройки, с", &c.BuildTime, 10, 15, 600)
-	inum(g, "Раундов в бою", &c.RoundsPerBattle, 1, 1, 30)
+	inum(g, "Раундов в бою (на 2 игроков)", &c.RoundsPerBattle, 1, 1, 30)
+	f = append(f, fld{g, "Меньше раундов при 3-4 игроках (1=да)", func() float64 { return b2f(c.AutoRounds) }, func(v float64) { c.AutoRounds = v >= 0.5 }, 1, 0, 1, false})
 	num(g, "Время хода, с", &c.TurnTime, 5, 10, 180)
 	num(g, "Время отступления, с", &c.RetreatTime, 1, 0, 20)
 	num(g, "Время планирования (одновр.), с", &c.PlanTime, 5, 10, 120)
@@ -315,4 +318,11 @@ func (e *BalanceEditor) Draw(a *App, dst *ebiten.Image) {
 	if e.msgT > 0 {
 		a.Text(dst, e.msg, 380, ScreenH-52, 20, colGood)
 	}
+}
+
+func b2f(b bool) float64 {
+	if b {
+		return 1
+	}
+	return 0
 }

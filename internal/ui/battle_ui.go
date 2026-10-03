@@ -207,6 +207,15 @@ func (b *BattleUI) Update(a *App) {
 		b.focusT = 2.2
 		b.camManual = 0
 		b.weapon = ""
+		if w.Cfg.TurnMode == balance.TurnSimultaneous {
+			if w.Stage == sim.StagePlan {
+				m.say("ПЛАНИРУЙ ВЫСТРЕЛ!")
+			}
+		} else if w.Cur >= 0 && m.sess.Local(w.Cur) && m.hotseatMany() {
+			m.say(w.Players[w.Cur].Name + ": ТВОЙ ХОД!")
+		} else if w.Cur >= 0 && m.sess.Local(w.Cur) {
+			m.say("ТВОЙ ХОД!")
+		}
 	}
 	m.view.SelUnit, m.view.SelStruct = w.SelUnit, w.SelStruct
 	b.handleCameraInput(a)
@@ -673,7 +682,7 @@ func (b *BattleUI) drawTop(a *App, dst *ebiten.Image) {
 	x := float64(ScreenW)/2 - tw/2
 	a.Panel(dst, rectXYWH(int(x), 8, int(tw), 64))
 	a.TextB(dst, title, x+30, 10, 30, col)
-	sub := fmt.Sprintf("Раунд %d/%d", w.Round, w.Cfg.RoundsPerBattle)
+	sub := fmt.Sprintf("Раунд %d/%d", w.Round, w.Cfg.RoundsFor(len(w.Players)))
 	if timer > 0 {
 		sub += fmt.Sprintf("   %02d", int(math.Ceil(timer)))
 	}
@@ -844,7 +853,7 @@ func (b *BattleUI) drawTrajectory(a *App, dst *ebiten.Image, orig sim.Vec, ang f
 		vel.Y += g * wd.Gravity * sim.Dt
 		vel.X += w.Wind * wd.WindK * sim.Dt
 		pos = pos.Add(vel.Mul(sim.Dt))
-		if pos.Y > sim.WaterY || w.SolidPx(pos.X, pos.Y) {
+		if pos.Y > sim.WaterY || w.Terr.Solid(int(pos.X), int(pos.Y)) || w.StructAtPx(pos.X, pos.Y) != nil {
 			sx, sy := cam.ToScreen(pos)
 			a.Circle(dst, sx, sy, 5, color.RGBA{255, 90, 70, 200})
 			return

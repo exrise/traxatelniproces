@@ -66,6 +66,12 @@ func (w *World) damageUnit(u *Unit, dmg float64, attacker int) {
 		return
 	}
 	applied := w.hurtUnit(u, dmg, attacker, 0)
+	if w.curWeapon != "" && attacker >= 0 && w.Hostile(attacker, u.Owner) {
+		w.stat(w.curWeapon).Unit += applied
+		if !u.Alive {
+			w.stat(w.curWeapon).Kills++
+		}
+	}
 	w.credit(attacker, u.Owner, applied*w.Cfg.DmgMoneyUnit, unitCenter(u))
 }
 
@@ -113,6 +119,13 @@ func (w *World) damageStruct(s *Struct, dmg float64, attacker int) {
 	}
 	hpBefore := s.HP
 	applied := w.damageStructRaw(s, dmg, attacker)
+	if w.curWeapon != "" && attacker >= 0 && w.Hostile(attacker, s.Owner) {
+		if s.Def == "hq" {
+			w.stat(w.curWeapon).HQ += applied
+		} else {
+			w.stat(w.curWeapon).Struct += applied
+		}
+	}
 	w.credit(attacker, s.Owner, applied*w.Cfg.DmgMoneyStruct, w.StructCenter(s))
 	if hpBefore > 0 && !s.Alive && attacker >= 0 && w.Hostile(attacker, s.Owner) {
 		bonus := int(float64(w.Cfg.S(s.Def).Cost) * w.Cfg.StructKillPct)

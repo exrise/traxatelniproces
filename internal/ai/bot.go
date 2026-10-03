@@ -17,12 +17,13 @@ type Bot struct {
 	Skill float64 // 0..1, higher = less aim noise
 	rng   sim.RNG
 
-	turnKey int
-	delay   int
-	walk    int
-	walkDir int
-	moved   bool
-	planned bool
+	turnKey  int
+	delay    int
+	walk     int
+	walkDir  int
+	walks    int
+	advances int
+	planned  bool
 }
 
 // New creates a bot for a seat.
@@ -94,7 +95,11 @@ func (b *Bot) Think(w *sim.World) []sim.Command {
 		if p.Alive && p.Kind == sim.PDrone && p.Owner == b.Pid {
 			ts := b.targets(w, p.Pos)
 			if len(ts) > 0 {
-				d := ts[0].pos.Sub(p.Pos)
+				tp := ts[0].pos
+				if math.Abs(tp.X-p.Pos.X) > 260 {
+					tp.Y -= 600
+				}
+				d := tp.Sub(p.Pos)
 				out = append(out, sim.Command{Player: b.Pid, Type: sim.CmdSteer, Angle: math.Atan2(d.Y, d.X)})
 			}
 		}
@@ -124,7 +129,8 @@ func (b *Bot) Think(w *sim.World) []sim.Command {
 		b.turnKey = key
 		b.delay = 40
 		b.walk = 0
-		b.moved = false
+		b.walks = 0
+		b.advances = 0
 	}
 	if b.delay > 0 {
 		b.delay--
@@ -143,15 +149,26 @@ func (b *Bot) Think(w *sim.World) []sim.Command {
 	au, as := b.allowed(w)
 	a := b.plan(w, au, as)
 	if a == nil || a.score < 12 {
-		if !b.moved && au && w.SelUnit >= 0 {
+		if b.walks < 14 && w.TurnTimer > 9 && au && w.SelUnit >= 0 {
 			if dir := b.approachDir(w); dir != 0 {
-				b.moved = true
-				b.walk = 45 + b.rng.Intn(50)
+				b.walks++
+				b.walk = 50 + b.rng.Intn(40)
 				b.walkDir = dir
 				return append(out, sim.Command{Player: b.Pid, Type: sim.CmdWalk, Dir: dir})
 			}
 		}
 		return append(out, sim.Command{Player: b.Pid, Type: sim.CmdEndTurn})
+	}
+	if b.advances < 5 && w.TurnTimer > 18 && au {
+		if u, dir := b.advanceCandidate(w); u != nil {
+			b.advances++
+			b.walk = 70 + b.rng.Intn(60)
+			b.walkDir = dir
+			if w.SelUnit != u.ID {
+				out = append(out, sim.Command{Player: b.Pid, Type: sim.CmdSelectUnit, ID: u.ID})
+			}
+			return append(out, sim.Command{Player: b.Pid, Type: sim.CmdWalk, Dir: dir})
+		}
 	}
 	switch a.kind {
 	case "unit":
@@ -172,11 +189,23 @@ func (b *Bot) approachDir(w *sim.World) int {
 		return 0
 	}
 	u := w.Units[w.SelUnit]
-	ts := b.targets(w, u.Pos)
-	if len(ts) == 0 {
+	best, bestD := Vec{}, 1e9
+	for _, t := range b.targets(w, u.Pos) {
+		if d := t.pos.Dist(u.Pos); d < bestD {
+			best, bestD = t.pos, d
+		}
+	}
+	for _, c := range w.Points {
+		if c.Owner != b.Pid {
+			if d := c.Pos.Dist(u.Pos) * 0.8; d < bestD {
+				best, bestD = c.Pos, d
+			}
+		}
+	}
+	if bestD > 1e8 {
 		return 0
 	}
-	if ts[0].pos.X > u.Pos.X {
+	if best.X > u.Pos.X {
 		return 1
 	}
 	return -1
@@ -305,6 +334,9 @@ func (b *Bot) evalWeapon(w *sim.World, wd *balance.Weapon, muzzle Vec, unit, str
 				continue
 			}
 			ang := math.Atan2(d.Y, d.X)
+			if structID >= 0 {
+				ang = sim.ClampStructAim(ang)
+			}
 			hitPos, hu, hs := w.TraceRay(muzzle.Add(sim.Dir(ang).Mul(8)), ang, wd.Range, unit, structID)
 			_ = hitPos
 			var val float64
@@ -340,7 +372,11 @@ func (b *Bot) evalWeapon(w *sim.World, wd *balance.Weapon, muzzle Vec, unit, str
 			return nil
 		}
 		val := t.value * 0.5 * b.aaDiscount(w, wd, t.pos.X)
-		return &action{angle: math.Atan2(d.Y, d.X), power: 1, score: val * k}
+		ang := -1.0
+		if d.X < 0 {
+			ang = -math.Pi + 1.0
+		}
+		return &action{angle: ang, power: 1, score: val * k}
 	}
 	return nil
 }
@@ -368,6 +404,9 @@ func (b *Bot) evalBallistic(w *sim.World, wd *balance.Weapon, muzzle Vec, unit, 
 			base := math.Atan2(t.pos.Y-muzzle.Y, t.pos.X-muzzle.X)
 			for da := -0.12; da <= 0.12; da += 0.01 {
 				ang := base + da
+				if structID >= 0 {
+					ang = sim.ClampStructAim(ang)
+				}
 				v := sim.Dir(ang).Mul(wd.Speed)
 				imp, hit := w.PredictShell(muzzle.Add(sim.Dir(ang).Mul(10)), v, wd, b.Pid)
 				if !hit {
@@ -384,7 +423,7 @@ func (b *Bot) evalBallistic(w *sim.World, wd *balance.Weapon, muzzle Vec, unit, 
 	}
 	for _, dir := range dirs {
 		for ai := 0; ai < 26; ai++ {
-			elev := 0.08 + float64(ai)*0.055 // radians above horizontal
+			elev := 0.1 + float64(ai)*0.055 // radians above horizontal
 			var ang float64
 			if dir > 0 {
 				ang = -elev
@@ -469,4 +508,42 @@ func hasSpotter(w *sim.World, pid int) bool {
 		}
 	}
 	return false
+}
+
+// advanceCandidate finds a short-range infantry unit that should move closer to the enemy.
+func (b *Bot) advanceCandidate(w *sim.World) (*sim.Unit, int) {
+	for _, u := range w.UnitsOf(b.Pid) {
+		switch u.Def {
+		case "assault", "shotgun", "sniper":
+		default:
+			continue
+		}
+		reach := 0.0
+		for _, id := range w.Cfg.U(u.Def).Weapons {
+			if wd := w.Cfg.W(id); wd != nil && (wd.Kind == balance.KindBurst || wd.Kind == balance.KindPellets || wd.Kind == balance.KindShot) {
+				reach = math.Max(reach, wd.Range)
+			}
+		}
+		best, bestD := Vec{}, 1e9
+		for _, t := range b.targets(w, u.Pos) {
+			if d := t.pos.Dist(u.Pos); d < bestD {
+				best, bestD = t.pos, d
+			}
+		}
+		for _, c := range w.Points {
+			if c.Owner != b.Pid {
+				if d := c.Pos.Dist(u.Pos) * 0.8; d < bestD {
+					best, bestD = c.Pos, d
+				}
+			}
+		}
+		if bestD > 1e8 || bestD < reach*0.6 {
+			continue
+		}
+		if best.X > u.Pos.X {
+			return u, 1
+		}
+		return u, -1
+	}
+	return nil, 0
 }

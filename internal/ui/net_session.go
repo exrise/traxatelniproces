@@ -48,7 +48,9 @@ func (s *HostSession) IsHuman(pid int) bool { return s.LocalSession.IsHuman(pid)
 
 func (s *HostSession) Send(c sim.Command) {
 	c.Player = s.me
-	_ = s.W.Apply(c)
+	if err := s.W.Apply(c); err != nil {
+		s.LocalSession.lastErr = err.Error()
+	}
 }
 
 func (s *HostSession) BuildSeat() int {
@@ -185,3 +187,6 @@ func (s *ClientSession) Update() {
 		}
 	}
 }
+
+// PopError implements Session (the host rejects silently).
+func (s *ClientSession) PopError() string { return "" }

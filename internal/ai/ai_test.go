@@ -20,3 +20,23 @@ func TestBotMatchFinishes(t *testing.T) {
 		}
 	}
 }
+
+func TestTurnModesProgress(t *testing.T) {
+	for _, mode := range []balance.TurnMode{balance.TurnClassic, balance.TurnUnitAndStruct, balance.TurnSimultaneous} {
+		cfg := balance.Default()
+		cfg.TurnMode = mode
+		cfg.RoundsPerBattle = 3
+		r := RunMatch(cfg, 5, []Style{Balanced, Rocket, Air}, 0.8, 1800)
+		t.Logf("%s: finished=%v winner=%d builds=%d secs=%.0f", mode, r.Finished, r.Winner, r.Builds, r.Seconds)
+		if r.Builds < 2 {
+			t.Fatalf("%s: game never left the first battle", mode)
+		}
+		shots := 0
+		for _, s := range r.Stats {
+			shots += s.Shots
+		}
+		if shots < 5 {
+			t.Fatalf("%s: almost nothing was fired (%d shots)", mode, shots)
+		}
+	}
+}

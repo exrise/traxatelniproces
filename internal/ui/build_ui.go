@@ -92,7 +92,7 @@ func (b *BuildUI) itemsForTab() []palItem {
 			case 4:
 				ok = s.Kind == balance.SEco
 			}
-			if ok {
+			if ok && s.Tier < 50 {
 				out = append(out, palItem{"struct", s.ID})
 			}
 		}
@@ -372,10 +372,11 @@ func (b *BuildUI) Draw(a *App, dst *ebiten.Image) {
 	if t < 15 {
 		tcol = colBad
 	}
-	a.TextB(dst, fmt.Sprintf("Стройка %d    %d:%02d", w.BuildNo, int(t)/60, int(t)%60), 420, 14, 26, tcol)
+	a.TextB(dst, fmt.Sprintf("Стройка %d   %d:%02d", w.BuildNo, int(t)/60, int(t)%60), 400, 14, 24, tcol)
 	if b.errT > 0 {
 		a.TextCenter(dst, b.err, ScreenW/2+160, 66, 22, colBad, true)
 	}
+	b.drawReadyList(a, dst)
 	b.repair.Enabled = !p.Ready
 	b.repair.Draw(a, dst)
 	b.ready.Draw(a, dst)
@@ -511,7 +512,7 @@ func (b *BuildUI) describe(it palItem) []string {
 				add("Снарядов в залпе: %d", wd.Count)
 			}
 		case balance.SAA, balance.SJammer:
-			add("Дальность %.0f, боезапас %d", d.AARange, d.AAAmmo)
+			add("Радиус %.0f (по высоте больше), боезапас %d", d.AARange, d.AAAmmo)
 			var hs []string
 			for _, cl := range []balance.AAClass{balance.ClassDrone, balance.ClassAir, balance.ClassRocket, balance.ClassBallis, balance.ClassOreshnik} {
 				if v, ok := d.AAHit[cl]; ok {
@@ -595,7 +596,7 @@ func (b *BuildUI) drawGhost(a *App, dst *ebiten.Image, pid int) {
 		a.Border(dst, sx, sy, float64(d.W*sim.Cell)*z, float64(d.H*sim.Cell)*z, 2, bc)
 		if d.AARange > 0 {
 			ccx, ccy := sx+float64(d.W*sim.Cell)*z/2, sy+float64(d.H*sim.Cell)*z/2
-			vecCircleOutline(a, dst, ccx, ccy, d.AARange*z, color.RGBA{120, 220, 255, 120})
+			vecEllipseOutline(a, dst, ccx, ccy, d.AARange*z, d.AARange*z*2.5, color.RGBA{120, 220, 255, 120})
 		}
 		if err != nil {
 			a.TextCenter(dst, err.Error(), sx+float64(d.W*sim.Cell)*z/2, sy-26*z, 18, colBad, true)
@@ -608,5 +609,30 @@ func vecCircleOutline(a *App, dst *ebiten.Image, x, y, r float64, col color.RGBA
 	for i := 0; i < n; i += 2 {
 		a0, a1 := float64(i)/n*2*math.Pi, float64(i+1)/n*2*math.Pi
 		a.Line(dst, x+math.Cos(a0)*r, y+math.Sin(a0)*r, x+math.Cos(a1)*r, y+math.Sin(a1)*r, 2, col)
+	}
+}
+
+func vecEllipseOutline(a *App, dst *ebiten.Image, x, y, rx, ry float64, col color.RGBA) {
+	const n = 96
+	for i := 0; i < n; i += 2 {
+		a0, a1 := float64(i)/n*2*math.Pi, float64(i+1)/n*2*math.Pi
+		a.Line(dst, x+math.Cos(a0)*rx, y+math.Sin(a0)*ry, x+math.Cos(a1)*rx, y+math.Sin(a1)*ry, 2, col)
+	}
+}
+
+// drawReadyList shows who is still building (top bar, middle).
+func (b *BuildUI) drawReadyList(a *App, dst *ebiten.Image) {
+	w := b.m.w
+	x := 640.0
+	for _, p := range w.Players {
+		col := gfx.TeamColors[p.Color%4]
+		a.Circle(dst, x+8, 29, 7, col)
+		st, sc := "строит", color.Color(colDim)
+		if p.Ready {
+			st, sc = "готов", colGood
+		}
+		a.Text(dst, p.Name, x+20, 8, 15, colText)
+		a.Text(dst, st, x+20, 28, 15, sc)
+		x += 20 + math.Max(a.Measure(p.Name, 15, false), 50) + 12
 	}
 }

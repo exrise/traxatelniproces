@@ -62,6 +62,8 @@ type World struct {
 	StructActed bool
 	FiredUnit   int // the unit that fired this turn (can still run during retreat)
 	SettleT     float64
+	Stats       map[string]*WStat
+	curWeapon   string
 	LastUnit    map[int]int
 	Plans       map[int]*Plan
 
@@ -163,7 +165,8 @@ func (w *World) SolidPx(x, y float64) bool {
 	if w.Terr.Solid(int(math.Floor(x)), int(math.Floor(y))) {
 		return true
 	}
-	return w.StructAtPx(x, y) != nil
+	s := w.StructAtPx(x, y)
+	return s != nil && w.Cfg.S(s.Def).Kind != balance.SBunker
 }
 
 // StructRect returns the pixel rectangle of a structure.

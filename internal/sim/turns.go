@@ -179,10 +179,11 @@ func (w *World) nextTurn() {
 		w.OrderPos++
 		if w.OrderPos >= len(w.Order) {
 			w.Round++
-			if w.Round > w.Cfg.RoundsPerBattle {
+			if w.Round > w.Cfg.RoundsFor(len(w.Players)) {
 				w.endBattle()
 				return
 			}
+			w.suddenDeath()
 			w.buildOrder()
 			w.OrderPos = 0
 			if len(w.Order) == 0 {
@@ -377,10 +378,11 @@ func (w *World) stepSimultaneous() {
 				return
 			}
 			w.Round++
-			if w.Round > w.Cfg.RoundsPerBattle {
+			if w.Round > w.Cfg.RoundsFor(len(w.Players)) {
 				w.endBattle()
 				return
 			}
+			w.suddenDeath()
 			w.beginPlan()
 		}
 	}
@@ -428,4 +430,23 @@ func (w *World) resolvePlans() {
 		}
 		_ = w.launch(sp)
 	}
+}
+
+// suddenDeath burns every HQ a little each round once a long match drags on.
+// More players means slower kills per victim, so the burn starts earlier and hits harder.
+func (w *World) suddenDeath() {
+	c := w.Cfg
+	n := len(w.Players)
+	start := c.SuddenDeathBattle - (n-2)/2
+	if c.SuddenDeathBattle <= 0 || w.BattleNo < max(3, start) || c.SuddenDeathDmg <= 0 {
+		return
+	}
+	dmg := c.SuddenDeathDmg * (1 + 0.5*float64(n-2))
+	for _, p := range w.Players {
+		if w.PlayerAlive(p.ID) {
+			w.damageStructRaw(w.Structs[p.HQ], dmg, -1)
+		}
+	}
+	w.msg("Внезапная смерть: штабы горят!")
+	w.refreshElim()
 }

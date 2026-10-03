@@ -6,10 +6,13 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"svinovoyna/internal/sfx"
 	"svinovoyna/internal/ui"
 )
 
 func main() {
+	sfx.Init()
+	ui.PlaySound = sfx.Play
 	ebiten.SetWindowSize(1280, 720)
 	ebiten.SetWindowTitle("Свиновойна")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)

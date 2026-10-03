@@ -29,6 +29,8 @@ type Session interface {
 	BuildSeatTime() float64
 	Close()
 	Status() string
+	// PopError returns (and clears) the last rejected command message.
+	PopError() string
 }
 
 // LocalSession runs the simulation in-process with bots and hotseat humans.
@@ -40,6 +42,7 @@ type LocalSession struct {
 	seatT   float64
 	seatNo  int // build number the seat state belongs to
 	hotseat bool
+	lastErr string
 }
 
 // NewLocalSession creates a match from lobby slots.
@@ -90,7 +93,9 @@ func (s *LocalSession) Send(c sim.Command) {
 	if !s.IsHuman(c.Player) {
 		return
 	}
-	_ = s.W.Apply(c)
+	if err := s.W.Apply(c); err != nil {
+		s.lastErr = err.Error()
+	}
 }
 
 func (s *LocalSession) nextSeat() {
@@ -149,4 +154,11 @@ func (s *LocalSession) Update() {
 		}
 	}
 	w.Step()
+}
+
+// PopError implements Session.
+func (s *LocalSession) PopError() string {
+	e := s.lastErr
+	s.lastErr = ""
+	return e
 }

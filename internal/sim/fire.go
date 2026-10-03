@@ -103,6 +103,9 @@ func (w *World) launch(sp FireSpec) error {
 		muzzle = w.StructMuzzle(hq)
 		ignoreStruct = hq.ID
 	}
+	w.curWeapon = wd.ID
+	defer func() { w.curWeapon = "" }()
+	w.stat(wd.ID).Shots++
 	pw := clamp(sp.Power, 0.1, 1)
 	k := w.dmgMul()
 	owner := sp.Player
@@ -185,7 +188,11 @@ func (w *World) callAirstrike(sp FireSpec, wd *balance.Weapon, k float64) {
 	if dir < 0 {
 		startX = float64(w.Terr.W) + 150
 	}
-	const planeY = 130.0
+	const planeY = 320.0
+	gk := wd.Gravity
+	if gk <= 0 {
+		gk = 1
+	}
 	plane := w.newProj(Proj{Kind: PPlane, Owner: owner, Weapon: wd.ID, Pos: Vec{startX, planeY}, Vel: Vec{dir * wd.Speed, 0}, Class: wd.Class})
 	w.emit(Event{Type: EvPlane, Pos: plane.Pos, A: owner})
 	n := max(1, wd.Count)
@@ -196,7 +203,7 @@ func (w *World) callAirstrike(sp FireSpec, wd *balance.Weapon, k float64) {
 			x = tx + w.RNG.Norm()*(wd.Spread*(spreadK-1)*0.5+4)
 		}
 		gy := float64(w.Terr.SurfaceY(int(clamp(x, 0, float64(w.Terr.W-1))), 0))
-		t := math.Sqrt(2 * (gy - planeY) / w.Cfg.GravityPx)
+		t := math.Sqrt(2 * (gy - planeY) / (w.Cfg.GravityPx * gk))
 		dropX := x - dir*wd.Speed*t
 		at := w.Time + (dropX-startX)/(dir*wd.Speed)
 		w.Spawns = append(w.Spawns, Spawn{At: at, Parent: plane.ID, Proj: Proj{Kind: PBomb, Owner: owner, Weapon: wd.ID,

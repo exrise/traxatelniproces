@@ -32,13 +32,13 @@ type buy struct {
 }
 
 var lists = map[Style][]buy{
-	Balanced: {{'u', "assault", 1}, {'s', "zu23", 1}, {'s', "d30", 1}, {'w', "", 4}, {'u', "mortar", 1}, {'u', "sniper", 1}, {'s', "dshk", 1},
+	Balanced: {{'u', "assault", 1}, {'s', "pantsir", 1}, {'s', "d30", 1}, {'w', "", 4}, {'u', "mortar", 1}, {'u', "sniper", 1}, {'s', "dshk", 1},
 		{'u', "rpg", 1}, {'s', "farm", 1}, {'w', "", 8}, {'s', "kornet", 1}, {'s', "pantsir", 1}, {'i', "fab", 1}, {'u', "spotter", 1},
 		{'s', "grad", 1}, {'s', "iskander", 1}, {'u', "shotgun", 1}, {'s', "oil", 1}, {'i', "kab", 1}, {'s', "s400", 1}, {'s', "oreshnik", 1}, {'w', "", 14}},
-	Infantry: {{'u', "assault", 2}, {'u', "sniper", 1}, {'u', "rpg", 1}, {'u', "mortar", 1}, {'u', "shotgun", 1}, {'w', "", 4}, {'s', "zu23", 1},
+	Infantry: {{'u', "assault", 2}, {'u', "sniper", 1}, {'u', "rpg", 1}, {'u', "mortar", 1}, {'u', "shotgun", 1}, {'w', "", 4}, {'s', "pantsir", 1},
 		{'u', "engineer", 1}, {'u', "dronner", 1}, {'u', "assault", 3}, {'s', "dshk", 1}, {'u', "sniper", 2}, {'w', "", 8}, {'s', "pantsir", 1},
 		{'u', "rpg", 2}, {'u', "mortar", 2}, {'s', "d30", 1}, {'w', "", 12}},
-	Turret: {{'s', "dshk", 1}, {'s', "d30", 1}, {'w', "", 4}, {'s', "kornet", 1}, {'u', "mortar", 1}, {'s', "zu23", 1}, {'s', "d30", 2}, {'s', "bunker", 1},
+	Turret: {{'s', "dshk", 1}, {'s', "d30", 1}, {'w', "", 4}, {'s', "kornet", 1}, {'u', "mortar", 1}, {'s', "pantsir", 1}, {'s', "d30", 2}, {'s', "bunker", 1},
 		{'s', "grad", 1}, {'w', "", 8}, {'s', "dshk", 2}, {'s', "kornet", 2}, {'s', "pantsir", 1}, {'s', "d30", 3}, {'s', "grad", 2}, {'w', "", 14}},
 	Rocket: {{'s', "grad", 1}, {'u', "spotter", 1}, {'s', "d30", 1}, {'s', "zu23", 1}, {'i', "fab", 1}, {'w', "", 3}, {'s', "iskander", 1}, {'s', "pantsir", 1},
 		{'s', "grad", 2}, {'s', "oreshnik", 1}, {'i', "kab", 1}, {'u', "assault", 1}, {'w', "", 8}, {'s', "s400", 1}, {'i', "fab", 2}},
@@ -67,6 +67,13 @@ func (b *Bot) Build(w *sim.World) {
 	}
 	wallsWanted := 0
 	for pass := 0; pass < 3; pass++ {
+		if pass == 1 {
+			layers := 1
+			if b.Style == Turtle {
+				layers = 2
+			}
+			b.roofHQ(w, layers)
+		}
 		for _, it := range list {
 			switch it.kind {
 			case 'u':
@@ -200,6 +207,41 @@ func (b *Bot) spendRest(w *sim.World) {
 	for _, s := range w.StructsOf(b.Pid) {
 		if c := w.RepairCost(s); c > 0 && c < p.Money {
 			_ = w.Repair(b.Pid, s.ID)
+		}
+	}
+}
+
+// roofHQ covers the headquarters (and weapon emplacements for turtles) with blocks.
+func (b *Bot) roofHQ(w *sim.World, layers int) {
+	p := w.Players[b.Pid]
+	if p.HQ < 0 {
+		return
+	}
+	cover := func(s *sim.Struct, layers int) {
+		d := w.Cfg.S(s.Def)
+		for l := 1; l <= layers; l++ {
+			for x := s.CX; x < s.CX+d.W; x += 2 {
+				def := "concrete"
+				if l > 1 {
+					def = "sandbag"
+				}
+				if x+2 > s.CX+d.W {
+					x = s.CX + d.W - 2
+				}
+				cy := s.CY - l
+				if w.StructAtCell(x, cy) != nil {
+					continue
+				}
+				_ = w.PlaceStruct(b.Pid, def, x, cy)
+			}
+		}
+	}
+	cover(w.Structs[p.HQ], layers)
+	if b.Style == Turtle {
+		for _, s := range w.StructsOf(b.Pid) {
+			if k := w.Cfg.S(s.Def).Kind; k == balance.SWeapon || k == balance.SAA {
+				cover(s, 1)
+			}
 		}
 	}
 }

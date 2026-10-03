@@ -241,3 +241,120 @@ func TestFullCycle(t *testing.T) {
 		t.Fatalf("base income not paid: %d", w.Players[0].Money)
 	}
 }
+
+// battleWith prepares a 2-player battle where player 0 owns the given structure and units.
+func battleWith(t *testing.T, structDef string, units ...string) (*World, *Struct) {
+	t.Helper()
+	w := newTest(2, 21)
+	w.BuildNo = 3
+	for _, p := range w.Players {
+		p.Money = 20000
+	}
+	hq := w.Structs[w.Players[0].HQ]
+	var st *Struct
+	if structDef != "" {
+		d := w.Cfg.S(structDef)
+		cx := hq.CX + 6
+		if err := w.PlaceStruct(0, structDef, cx, w.DropCell(cx, d.W, d.H, hq.CY-6)); err != nil {
+			t.Fatal(err)
+		}
+		st = w.Structs[len(w.Structs)-1]
+	}
+	for i, u := range units {
+		x := float64(w.Players[0].ZoneX0+w.Players[0].ZoneX1)/2 + 80 + float64(i)*30
+		if err := w.PlaceUnit(0, u, x, 100); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.SetReady(0, true)
+	w.SetReady(1, true)
+	w.Step()
+	for w.Cur != 0 {
+		w.Apply(Command{Player: w.Cur, Type: CmdEndTurn})
+		run(w, 1.5)
+	}
+	return w, st
+}
+
+func TestBallisticMissilesHitTarget(t *testing.T) {
+	for _, def := range []string{"iskander", "oreshnik"} {
+		w, st := battleWith(t, def)
+		enemy := w.Structs[w.Players[1].HQ]
+		before := enemy.HP
+		w.Apply(Command{Player: 0, Type: CmdSelectStruct, ID: st.ID})
+		tx := w.StructCenter(enemy).X
+		if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: w.Cfg.S(def).Weapon, X: tx, Power: 1, Angle: -1.5}); err != nil {
+			t.Fatalf("%s: %v", def, err)
+		}
+		run(w, 12)
+		if enemy.HP >= before {
+			t.Fatalf("%s did not damage the target HQ (%.0f -> %.0f)", def, before, enemy.HP)
+		}
+		t.Logf("%s: HQ %.0f -> %.0f", def, before, enemy.HP)
+	}
+}
+
+func TestDroneSteersAndExplodes(t *testing.T) {
+	w, _ := battleWith(t, "", "dronner")
+	enemy := w.Structs[w.Players[1].HQ]
+	u := w.UnitsOf(0)[0]
+	w.Apply(Command{Player: 0, Type: CmdSelectUnit, ID: u.ID})
+	before := enemy.HP
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "fpv", Angle: -0.9, Power: 1}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 60*10; i++ {
+		for _, p := range w.Projs {
+			if p.Kind == PDrone && p.Alive {
+				tp := w.StructCenter(enemy)
+				if math.Abs(tp.X-p.Pos.X) > 250 {
+					tp.Y -= 700
+				}
+				d := tp.Sub(p.Pos)
+				w.Apply(Command{Player: 0, Type: CmdSteer, Angle: math.Atan2(d.Y, d.X)})
+			}
+		}
+		w.Step()
+	}
+	if enemy.HP >= before {
+		t.Fatalf("drone never hit the enemy HQ")
+	}
+}
+
+func TestMineAndRepair(t *testing.T) {
+	w, _ := battleWith(t, "sandbag", "engineer")
+	u := w.UnitsOf(0)[0]
+	w.Apply(Command{Player: 0, Type: CmdSelectUnit, ID: u.ID})
+	// damage the sandbag, then repair it with the engineer standing next to it
+	var bag *Struct
+	for _, s := range w.StructsOf(0) {
+		if s.Def == "sandbag" {
+			bag = s
+		}
+	}
+	bag.HP = 10
+	u.Pos = Vec{w.StructCenter(bag).X + 10, w.StructCenter(bag).Y + 8}
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "repair"}); err != nil {
+		t.Fatal(err)
+	}
+	if bag.HP <= 10 {
+		t.Fatalf("repair did nothing")
+	}
+}
+
+func TestAirstrikeNeedsStockAndSpotterHelps(t *testing.T) {
+	w, _ := battleWith(t, "")
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "kab", X: 1500}); err == nil {
+		t.Fatal("airstrike without stock must fail")
+	}
+	w.Players[0].Items["kab"] = 1
+	enemy := w.Structs[w.Players[1].HQ]
+	before := enemy.HP
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "kab", X: w.StructCenter(enemy).X}); err != nil {
+		t.Fatal(err)
+	}
+	run(w, 10)
+	if enemy.HP >= before {
+		t.Fatalf("KAB missed the HQ completely (even without a spotter it should be close)")
+	}
+}

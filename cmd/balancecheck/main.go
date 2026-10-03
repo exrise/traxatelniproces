@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 
 	"svinovoyna/internal/ai"
@@ -22,6 +24,9 @@ func main() {
 	maxMin := flag.Float64("max", 60, "max simulated minutes per match")
 	hqHP := flag.Float64("hq", 0, "override HQ hit points")
 	rounds := flag.Int("rounds", 0, "override rounds per battle")
+	seats := flag.String("seats", "", "trace seats as comma separated style numbers, e.g. 4,5")
+	matrix := flag.Int("matrix", 0, "play every strategy pair N times per seat order and print the win matrix")
+	weapons := flag.Bool("weapons", false, "print per-weapon statistics")
 	trace := flag.Bool("trace", false, "print per-battle log of one match")
 	static := flag.Bool("static", false, "print static weapon efficiency table and exit")
 	flag.Parse()
@@ -47,6 +52,10 @@ func main() {
 	if *rounds > 0 {
 		cfg.RoundsPerBattle = *rounds
 	}
+	if *matrix > 0 {
+		matrixReport(cfg, *matrix, *skill, *maxMin)
+		return
+	}
 	if *static {
 		staticReport(cfg)
 		return
@@ -55,6 +64,10 @@ func main() {
 		st := make([]ai.Style, *players)
 		for i := range st {
 			st[i] = ai.Style(i % int(ai.NumStyles))
+			if parts := strings.Split(*seats, ","); *seats != "" && i < len(parts) {
+				n, _ := strconv.Atoi(parts[i])
+				st[i] = ai.Style(n)
+			}
 		}
 		r := ai.RunMatchLog(cfg, 1, st, *skill, *maxMin*60, func(f string, a ...any) { fmt.Printf(f+"\n", a...) })
 		fmt.Printf("итог: победитель=%d завершено=%v время=%.0f с\n", r.Winner, r.Finished, r.Seconds)
@@ -122,6 +135,9 @@ func main() {
 		fmt.Printf("%-18s %4d %6d  %5.1f%%\n", s, played[s], won[s], wr)
 	}
 	fmt.Println()
+	if *weapons {
+		weaponReport(cfg, results)
+	}
 	fmt.Print("Победы по слоту (порядок игроков): ")
 	for i, v := range seatW {
 		fmt.Printf("[%d]=%d ", i+1, v)

@@ -142,15 +142,18 @@ type Config struct {
 	Name string `json:"name"`
 
 	// Phases
-	TurnMode        TurnMode `json:"turn_mode"`
-	StartMoney      int      `json:"start_money"`
-	BuildTimeFirst  float64  `json:"build_time_first"`
-	BuildTime       float64  `json:"build_time"`
-	RoundsPerBattle int      `json:"rounds_per_battle"`
-	TurnTime        float64  `json:"turn_time"`
-	RetreatTime     float64  `json:"retreat_time"`
-	PlanTime        float64  `json:"plan_time"` // simultaneous mode planning time
-	MaxHQHP         float64  `json:"hq_hp"`
+	TurnMode          TurnMode `json:"turn_mode"`
+	StartMoney        int      `json:"start_money"`
+	BuildTimeFirst    float64  `json:"build_time_first"`
+	BuildTime         float64  `json:"build_time"`
+	RoundsPerBattle   int      `json:"rounds_per_battle"`
+	AutoRounds        bool     `json:"auto_rounds"` // fewer rounds with more players (-1 per extra player)
+	TurnTime          float64  `json:"turn_time"`
+	RetreatTime       float64  `json:"retreat_time"`
+	PlanTime          float64  `json:"plan_time"` // simultaneous mode planning time
+	MaxHQHP           float64  `json:"hq_hp"`
+	SuddenDeathBattle int      `json:"sudden_death_battle"` // from this battle on HQs burn every round (0 = off)
+	SuddenDeathDmg    float64  `json:"sudden_death_dmg"`
 
 	// Economy
 	BaseIncome     int     `json:"base_income"`      // each build phase
@@ -353,4 +356,16 @@ func LoadCustom(dir string) []*Config {
 		}
 	}
 	return out
+}
+
+// RoundsFor returns the number of battle rounds for n players.
+func (c *Config) RoundsFor(n int) int {
+	r := c.RoundsPerBattle
+	if c.AutoRounds && n > 2 {
+		r -= n - 2
+	}
+	if r < 2 {
+		r = 2
+	}
+	return r
 }

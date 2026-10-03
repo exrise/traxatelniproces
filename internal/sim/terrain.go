@@ -194,8 +194,8 @@ func GenerateTerrain(n int, seed uint64) (*Terrain, []Vec) {
 	// rock blobs and a rock layer
 	type blob struct{ x, y, r float64 }
 	var blobs []blob
-	for i := 0; i < W/70; i++ {
-		blobs = append(blobs, blob{rng.Range(0, float64(W)), rng.Range(PlateauY+30, MapH-100), rng.Range(18, 60)})
+	for i := 0; i < W/110; i++ {
+		blobs = append(blobs, blob{rng.Range(0, float64(W)), rng.Range(PlateauY+30, MapH-100), rng.Range(10, 30)})
 	}
 	for x := 0; x < W; x++ {
 		top := int(height[x])

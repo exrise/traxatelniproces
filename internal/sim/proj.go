@@ -19,7 +19,9 @@ func (w *World) detonate(p *Proj, at Vec) {
 	if wd == nil {
 		return
 	}
+	w.curWeapon = wd.ID
 	w.Explode(at, w.spec(p, wd))
+	w.curWeapon = ""
 }
 
 func (w *World) cancelSpawns(parent int) {
@@ -38,11 +40,11 @@ func (w *World) projBlocked(p *Proj) bool {
 	if w.Terr.Solid(int(math.Floor(x)), int(math.Floor(y))) {
 		return true
 	}
-	if s := w.StructAtPx(x, y); s != nil && !(p.Age < 0.1 && s.Owner == p.Owner) {
+	if s := w.StructAtPx(x, y); s != nil && !(ownGhost(p) && s.Owner == p.Owner) {
 		return true
 	}
 	for _, u := range w.Units {
-		if !u.Alive || (p.Age < 0.12 && u.Owner == p.Owner) {
+		if !u.Alive || (ownGhost(p) && u.Owner == p.Owner) {
 			continue
 		}
 		if math.Abs(x-u.Pos.X) <= UnitW/2+2 && y >= u.Pos.Y-UnitH-2 && y <= u.Pos.Y+1 {
@@ -176,7 +178,11 @@ func (w *World) stepProj(p *Proj) {
 			w.detonate(p, p.Pos)
 		}
 	case PBomb:
-		p.Vel.Y += g * Dt
+		bg := wd.Gravity
+		if bg <= 0 {
+			bg = 1
+		}
+		p.Vel.Y += g * bg * Dt
 		p.Vel.X += w.Wind * 0.3 * Dt
 		if w.advance(p, false) {
 			w.detonate(p, p.Pos)
@@ -317,4 +323,16 @@ func (w *World) StructsSettled() bool {
 		}
 	}
 	return true
+}
+
+// ownGhost: young projectiles (and climbing loitering munitions / fresh drones)
+// pass through their owner's own base so they can leave it.
+func ownGhost(p *Proj) bool {
+	switch p.Kind {
+	case PGeran:
+		return p.Phase == 0
+	case PDrone:
+		return p.Age < 0.6
+	}
+	return p.Age < 0.12
 }

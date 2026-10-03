@@ -1,6 +1,8 @@
 package sim
 
 import (
+	"math"
+
 	"svinovoyna/internal/balance"
 )
 
@@ -42,7 +44,7 @@ func (w *World) stepAA() {
 			if !interceptable(p) || !w.Hostile(s.Owner, p.Owner) || contains(p.Tried, s.ID) {
 				continue
 			}
-			if p.Pos.Dist(c) > d.AARange {
+			if aaDist(p.Pos, c) > d.AARange {
 				continue
 			}
 			prob, ok := d.AAHit[p.Class]
@@ -58,6 +60,7 @@ func (w *World) stepAA() {
 			p.Tried = append(p.Tried, s.ID)
 			if w.RNG.F() < prob {
 				p.Alive = false
+				w.stat(p.Weapon).Intercepted++
 				w.emit(Event{Type: EvIntercept, Pos: p.Pos, To: c, A: s.Owner, Text: string(p.Class)})
 				if p.Kind == PPlane {
 					w.cancelSpawns(p.ID)
@@ -67,4 +70,11 @@ func (w *World) stepAA() {
 			}
 		}
 	}
+}
+
+// aaDist is the engagement distance: vertical distance counts for less than
+// horizontal, so ground batteries can reach aircraft flying high above them.
+func aaDist(a, b Vec) float64 {
+	dx, dy := a.X-b.X, (a.Y-b.Y)*0.4
+	return math.Sqrt(dx*dx + dy*dy)
 }

@@ -143,7 +143,7 @@ func (w *World) EstimateExplosion(pos Vec, radius, damage float64, owner int, bl
 		dmg := damage * f * blockMul * (1 - def.Blast*(1-pierce)) * (0.5 + 0.5*w.blastShield(pos, w.StructCenter(s), s.ID))
 		cost := float64(def.Cost)
 		if def.Kind == balance.SHQ {
-			cost = 1600
+			cost = 1600 * (1 + 2*(1-s.HP/s.MaxHP))
 		}
 		eff := math.Min(dmg, s.HP)
 		val := eff / s.MaxHP * cost * 0.8

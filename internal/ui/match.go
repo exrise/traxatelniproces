@@ -47,6 +47,9 @@ type Match struct {
 	paused bool
 	pauseB []*Button
 	fast   bool
+	help   bool
+	toast  string
+	toastT float64
 	over   *Button
 }
 
@@ -116,6 +119,9 @@ func (m *Match) Update(a *App) error {
 	if m.fast {
 		steps = 3
 	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
+		m.help = !m.help
+	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF) && ebiten.IsKeyPressed(ebiten.KeyShift) {
 		m.fast = !m.fast
 	}
@@ -151,6 +157,12 @@ func (m *Match) Update(a *App) error {
 			m.exit()
 		}
 		m.battle.cameraIdle(a)
+	}
+	if e := m.sess.PopError(); e != "" {
+		m.toast, m.toastT = e, 2.2
+	}
+	if m.toastT > 0 {
+		m.toastT -= sim.Dt
 	}
 	if a.EscapeKey && m.w.Phase != sim.PhaseOver {
 		if _, ok := m.sess.(*LocalSession); ok {
@@ -254,8 +266,14 @@ func (m *Match) Draw(a *App, dst *ebiten.Image) {
 		m.pauseB[0].Draw(a, dst)
 		m.pauseB[1].Draw(a, dst)
 	}
+	if m.toastT > 0 && m.toast != "" {
+		a.TextCenter(dst, m.toast, ScreenW/2, ScreenH-215, 24, colBad, true)
+	}
+	if m.help {
+		m.drawHelp(a, dst)
+	}
 	if m.fast {
-		a.Text(dst, "▶▶ ускорение (Shift+F)", ScreenW-250, ScreenH-24, 16, colGold)
+		a.Text(dst, ">> ускорение (Shift+F)", ScreenW-250, ScreenH-24, 16, colGold)
 	}
 }
 
@@ -306,4 +324,25 @@ func (m *Match) drawOver(a *App, dst *ebiten.Image) {
 	a.TextCenter(dst, name, ScreenW/2, 270, 56, col, true)
 	a.TextCenter(dst, fmt.Sprintf("Сыграно боёв: %d  •  время: %d мин", m.w.BattleNo, int(m.w.Time/60)), ScreenW/2, 370, 24, colDim, false)
 	m.over.Draw(a, dst)
+}
+
+func (m *Match) drawHelp(a *App, dst *ebiten.Image) {
+	a.Rect(dst, 0, 0, ScreenW, ScreenH, color.RGBA{0, 0, 0, 190})
+	x, y := 160.0, 70.0
+	a.TextB(dst, "Справка (F1 — закрыть)", x, y, 38, colGold)
+	lines := []string{
+		"ЦЕЛЬ: разрушить штаб врага. Потерял штаб — вылетел.",
+		"СТРОЙКА: покупай юнитов, орудия, ПВО, защиту. ЛКМ — поставить, ПКМ — продать, R — починить.",
+		"Постройки без опоры падают. Крыша над штабом ловит бомбы и снаряды сверху.",
+		"БОЙ: A/D — идти, W — прыжок, мышь — прицел, ЛКМ или Пробел — огонь (держи — сила выстрела).",
+		"1…9 — выбор оружия, Tab — следующий юнит, Q — следующее орудие, E — закончить ход.",
+		"Искандер, Орешник, авиаудары, «Герань»: кликни по карте (цель) и нажми «Огонь».",
+		"FPV-дрон летит за курсором, клик — подрыв. ПВО стреляет по самолётам, дронам и ракетам само.",
+		"ДЕНЬГИ: за урон и убийства, с нефтевышек и ферм, с точек захвата (флажки на карте).",
+		"Урон по лидеру (★) оплачивается лучше. Проигравшим возвращается часть потерь.",
+		"Камера: ПКМ + движение, колесо — масштаб, клик по миникарте. T — траектория, Esc — пауза.",
+	}
+	for i, l := range lines {
+		a.Text(dst, l, x, y+70+float64(i)*40, 22, colText)
+	}
 }

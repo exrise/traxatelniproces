@@ -40,7 +40,7 @@ func newRulesPanel(a *App) *rulesPanel {
 	}
 	x := 690
 	r.steps = []*stepper{
-		newStepper("Раундов в бою", x, 372, func() string { return fmt.Sprint(r.cfg.RoundsPerBattle) }, func() { r.cfg.RoundsPerBattle = max(1, r.cfg.RoundsPerBattle-1) }, func() { r.cfg.RoundsPerBattle = min(30, r.cfg.RoundsPerBattle+1) }),
+		newStepper("Раундов (на 2 игроков)", x, 372, func() string { return fmt.Sprint(r.cfg.RoundsPerBattle) }, func() { r.cfg.RoundsPerBattle = max(1, r.cfg.RoundsPerBattle-1) }, func() { r.cfg.RoundsPerBattle = min(30, r.cfg.RoundsPerBattle+1) }),
 		newStepper("Время хода, с", x, 414, func() string { return fmt.Sprint(int(r.cfg.TurnTime)) }, func() { r.cfg.TurnTime = max(10, r.cfg.TurnTime-5) }, func() { r.cfg.TurnTime = min(180, r.cfg.TurnTime+5) }),
 		newStepper("Стартовые деньги", x, 456, func() string { return fmt.Sprint(r.cfg.StartMoney) }, func() { r.cfg.StartMoney = max(300, r.cfg.StartMoney-100) }, func() { r.cfg.StartMoney += 100 }),
 		newStepper("Время стройки, с", x, 498, func() string { return fmt.Sprint(int(r.cfg.BuildTimeFirst)) }, func() { r.cfg.BuildTimeFirst = max(20, r.cfg.BuildTimeFirst-15) }, func() { r.cfg.BuildTimeFirst += 15 }),
@@ -119,7 +119,7 @@ func drawCfgSummary(a *App, dst *ebiten.Image, cfg *balance.Config, x, y float64
 	lines := []string{
 		"Пресет: " + cfg.Name,
 		"Режим хода: " + cfg.TurnMode.String(),
-		fmt.Sprintf("Раундов в бою: %d,  время хода: %.0f с", cfg.RoundsPerBattle, cfg.TurnTime),
+		fmt.Sprintf("Раундов в бою: %d,  время хода: %.0f с", cfg.RoundsFor(len(cfg.Units)*0+2), cfg.TurnTime),
 		fmt.Sprintf("Стартовые деньги: $%d,  стройка: %.0f с", cfg.StartMoney, cfg.BuildTimeFirst),
 		fmt.Sprintf("Огонь по своим: %v,  команды: %v", yesNo(cfg.FriendlyFire), yesNo(cfg.TeamsEnabled)),
 	}

@@ -14,6 +14,8 @@ type MatchResult struct {
 	Finished   bool
 	Money      []int
 	DamageDone []float64
+	Stats      map[string]sim.WStat
+	HQLeft     []float64
 }
 
 // RunMatch plays a complete game between bots using the given strategies.
@@ -73,5 +75,20 @@ func RunMatchLog(cfg *balance.Config, seed uint64, styles []Style, skill float64
 		res.Money = append(res.Money, p.Money)
 		res.DamageDone = append(res.DamageDone, p.DamageDone)
 	}
+	collectStats(w, &res)
 	return res
+}
+
+func collectStats(w *sim.World, res *MatchResult) {
+	res.Stats = map[string]sim.WStat{}
+	for k, v := range w.Stats {
+		res.Stats[k] = *v
+	}
+	for _, p := range w.Players {
+		f := 0.0
+		if p.HQ >= 0 && w.Structs[p.HQ].Alive {
+			f = w.Structs[p.HQ].HP / w.Structs[p.HQ].MaxHP
+		}
+		res.HQLeft = append(res.HQLeft, f)
+	}
 }

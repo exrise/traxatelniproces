@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
+
+	"svinovoyna/internal/balance"
 )
 
 // debugShot saves a screenshot when SVINO_DEBUG is set and the request file exists.
@@ -19,33 +21,37 @@ func (a *App) debugShot(screen *ebiten.Image) {
 		return
 	}
 	_ = os.Remove("/tmp/svino_shot_request")
-	path := strings.TrimSpace(string(b))
-	f, err := os.Create(path)
+	f, err := os.Create(strings.TrimSpace(string(b)))
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	w, h := screen.Bounds().Dx(), screen.Bounds().Dy()
-	img := screen.SubImage(screen.Bounds())
-	_ = w
-	_ = h
-	_ = png.Encode(f, img)
+	_ = png.Encode(f, screen.SubImage(screen.Bounds()))
 }
 
-// debugStart auto-starts a bots-only match when SVINO_DEBUG=bots:N.
+// debugStart auto-starts a match when SVINO_DEBUG=<bots|human|hot>:<players>[:<classic|two|sim>].
 func debugStart(a *App) Scene {
-	v := os.Getenv("SVINO_DEBUG")
-	if !strings.HasPrefix(v, "bots:") && !strings.HasPrefix(v, "human:") {
+	parts := strings.Split(os.Getenv("SVINO_DEBUG"), ":")
+	if len(parts) < 2 || (parts[0] != "bots" && parts[0] != "human" && parts[0] != "hot") {
 		return nil
 	}
-	n := int(v[len(v)-1] - '0')
+	n := int(parts[1][0] - '0')
 	if n < 2 || n > 4 {
 		n = 2
 	}
 	slots := make([]Slot, n)
 	for i := range slots {
-		slots[i] = Slot{Name: []string{"Хрюша", "Борька", "Кабан", "Пятачок"}[i], Human: strings.HasPrefix(v, "human:") && i == 0, Skill: 0.8, Color: i, Team: i}
+		human := parts[0] == "hot" || (parts[0] == "human" && i == 0)
+		slots[i] = Slot{Name: []string{"Хрюша", "Борька", "Кабан", "Пятачок"}[i], Human: human, Skill: 0.8, Color: i, Team: i}
 	}
 	cfg := a.Presets[0].Clone()
+	if len(parts) > 2 {
+		switch parts[2] {
+		case "two":
+			cfg.TurnMode = balance.TurnUnitAndStruct
+		case "sim":
+			cfg.TurnMode = balance.TurnSimultaneous
+		}
+	}
 	return NewMatch(a, NewLocalSession(cfg, 7, slots), nil)
 }

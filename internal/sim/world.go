@@ -281,18 +281,7 @@ func (w *World) supportedAt(cx, cy, cw, ch, ignore int) bool {
 // PlayerAlive: has an HQ or at least one living unit.
 func (w *World) PlayerAlive(id int) bool {
 	p := w.Players[id]
-	if p.Elim {
-		return false
-	}
-	if p.HQ >= 0 && w.Structs[p.HQ].Alive {
-		return true
-	}
-	for _, u := range w.Units {
-		if u.Owner == id && u.Alive {
-			return true
-		}
-	}
-	return false
+	return !p.Elim && p.HQ >= 0 && w.Structs[p.HQ].Alive
 }
 
 // HasHQ reports whether the player still owns a living HQ.
@@ -384,3 +373,20 @@ func (w *World) updateLeaders() {
 }
 
 func clamp(v, lo, hi float64) float64 { return math.Max(lo, math.Min(hi, v)) }
+
+// CountStructs counts living structures of a type owned by a player.
+func (w *World) CountStructs(owner int, def string) int { return w.countStructs(owner, def) }
+
+// CountWalls counts passive blocks (walls, bunkers) of a player.
+func (w *World) CountWalls(owner int) int {
+	n := 0
+	for _, s := range w.Structs {
+		if s.Alive && s.Owner == owner && w.Cfg.S(s.Def).Kind == balance.SBlock {
+			n++
+		}
+	}
+	return n
+}
+
+// DropCell is the exported cell-drop helper used by builders and the UI.
+func (w *World) DropCell(cx, cw, ch, from int) int { return w.dropCell(cx, cw, ch, from) }

@@ -95,6 +95,17 @@ func (w *World) refreshElim() {
 		if !p.Elim && !w.PlayerAlive(p.ID) {
 			p.Elim = true
 			w.msg("%s выбывает из игры", p.Name)
+			// everything the player owned collapses with the HQ
+			for _, u := range w.Units {
+				if u.Alive && u.Owner == p.ID {
+					w.killUnit(u, -1, "")
+				}
+			}
+			for _, s := range w.Structs {
+				if s.Alive && s.Owner == p.ID {
+					w.destroyStruct(s, -1)
+				}
+			}
 		}
 	}
 }

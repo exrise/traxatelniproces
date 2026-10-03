@@ -312,7 +312,7 @@ func (w *World) UnitsSettled() bool {
 // StructsSettled: nothing is collapsing.
 func (w *World) StructsSettled() bool {
 	for _, s := range w.Structs {
-		if s.Alive && s.Fall > 0 {
+		if s.Alive && s.Moving {
 			return false
 		}
 	}

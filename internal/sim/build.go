@@ -299,7 +299,7 @@ func (w *World) RepairCost(s *Struct) int {
 	d := w.Cfg.S(s.Def)
 	base := float64(d.Cost)
 	if d.Kind == balance.SHQ {
-		base = 300
+		base = w.Cfg.MaxHQHP * 1.5
 	}
 	return int(math.Ceil(base * w.Cfg.RepairCostPct * (1 - s.HP/s.MaxHP)))
 }

@@ -207,16 +207,14 @@ func (w *World) settleStructs() {
 			s.Hurt -= Dt
 		}
 		if w.supportedAt(s.CX, s.CY, d.W, d.H, s.ID) {
-			if s.Fall > 0 {
-				s.Fall = 0
-			}
+			s.Fall, s.Moving = 0, false
 			continue
 		}
 		s.Fall += Dt
 		if s.Fall < 0.10 {
 			continue
 		}
-		s.Fall = 0.0001
+		s.Fall = 0
 		// can it move down?
 		free := true
 		for x := 0; x < d.W; x++ {
@@ -225,8 +223,10 @@ func (w *World) settleStructs() {
 			}
 		}
 		if !free {
+			s.Moving = false
 			continue
 		}
+		s.Moving = true
 		w.setOcc(s, 0)
 		s.CY++
 		w.setOcc(s, int32(s.ID+1))

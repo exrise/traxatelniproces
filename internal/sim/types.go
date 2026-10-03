@@ -117,6 +117,7 @@ type Struct struct {
 	AAAmmo int
 	Aim    float64
 	Fall   float64 // fall timer
+	Moving bool    // moved down recently (not settled)
 	Hurt   float64
 	Acted  bool
 }

@@ -12,7 +12,7 @@ func Default() *Config {
 		TurnTime:        45,
 		RetreatTime:     6,
 		PlanTime:        30,
-		MaxHQHP:         400,
+		MaxHQHP:         1000,
 
 		BaseIncome:     900,
 		DmgMoneyUnit:   1.0,
@@ -71,7 +71,7 @@ func Default() *Config {
 		},
 
 		Structs: []StructDef{
-			{ID: "hq", Name: "Штаб", Kind: SHQ, Cost: 0, W: 4, H: 3, HP: 400, Armor: 0.3, Blast: 0.35, Desc: "Потеряешь — не сможешь строить."},
+			{ID: "hq", Name: "Штаб", Kind: SHQ, Cost: 0, W: 4, H: 3, HP: 1000, Armor: 0.3, Blast: 0.35, Desc: "Потеряешь штаб — проиграл."},
 			{ID: "sandbag", Name: "Мешки с песком", Kind: SBlock, Cost: 8, W: 2, H: 1, HP: 55, Armor: 0.5, Blast: 0.6, Desc: "Гасят взрывы."},
 			{ID: "concrete", Name: "Бетонный блок", Kind: SBlock, Cost: 20, W: 2, H: 1, HP: 150, Armor: 0.6, Blast: 0.35, Desc: "Много HP."},
 			{ID: "armor", Name: "Бронеплита", Kind: SBlock, Cost: 32, W: 1, H: 2, HP: 210, Armor: 0.9, Blast: 0.3, Desc: "Держит пули; слаба к кумулятиву."},

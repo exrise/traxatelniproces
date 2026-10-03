@@ -89,6 +89,14 @@ func (w *World) buildCheck(pid int) (*Player, error) {
 
 // PlaceStruct puts a structure on the grid.
 func (w *World) PlaceStruct(pid int, def string, cx, cy int) error {
+	if err := w.CanPlaceStruct(pid, def, cx, cy); err != nil {
+		return err
+	}
+	return w.placeStruct(pid, def, cx, cy)
+}
+
+// CanPlaceStruct validates a placement without changing anything.
+func (w *World) CanPlaceStruct(pid int, def string, cx, cy int) error {
 	p, err := w.buildCheck(pid)
 	if err != nil {
 		return err
@@ -119,6 +127,12 @@ func (w *World) PlaceStruct(pid int, def string, cx, cy int) error {
 	if !w.supportedAt(cx, cy, d.W, d.H, -1) {
 		return ErrSupport
 	}
+	return nil
+}
+
+func (w *World) placeStruct(pid int, def string, cx, cy int) error {
+	p := w.Players[pid]
+	d := w.Cfg.S(def)
 	p.Money -= d.Cost
 	p.Spent += d.Cost
 	s := w.addStruct(pid, def, cx, cy)
@@ -359,3 +373,38 @@ func (w *World) stepBuild() {
 func (w *World) StatusLine() string {
 	return fmt.Sprintf("phase=%d build=%d battle=%d round=%d t=%.1f", w.Phase, w.BuildNo, w.BattleNo, w.Round, w.Time)
 }
+
+// DropUnitPos exposes the unit placement helper to the UI (ghost preview).
+func (w *World) DropUnitPos(x, y float64) (Vec, bool) { return w.dropUnitPos(x, y) }
+
+// CanPlaceUnit validates buying a unit at (x,y) without changing anything.
+func (w *World) CanPlaceUnit(pid int, def string, x, y float64) (Vec, error) {
+	p, err := w.buildCheck(pid)
+	if err != nil {
+		return Vec{}, err
+	}
+	d := w.Cfg.U(def)
+	if d == nil {
+		return Vec{}, ErrUnknown
+	}
+	if d.Max > 0 && w.countUnits(pid, def) >= d.Max {
+		return Vec{}, ErrLimit
+	}
+	if w.countUnits(pid, "") >= w.Cfg.MaxUnits {
+		return Vec{}, ErrLimit
+	}
+	if p.Money < d.Cost {
+		return Vec{}, ErrMoney
+	}
+	if x-UnitW/2 < float64(p.ZoneX0) || x+UnitW/2 > float64(p.ZoneX1) {
+		return Vec{}, ErrZone
+	}
+	pos, ok := w.dropUnitPos(x, y)
+	if !ok {
+		return Vec{}, ErrBlocked
+	}
+	return pos, nil
+}
+
+// CountUnits counts alive units of a player (def "" = all).
+func (w *World) CountUnits(owner int, def string) int { return w.countUnits(owner, def) }

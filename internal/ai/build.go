@@ -95,6 +95,7 @@ func (b *Bot) Build(w *sim.World) {
 			break
 		}
 	}
+	b.spendRest(w)
 	// always field at least one unit
 	if len(w.UnitsOf(b.Pid)) == 0 {
 		for _, id := range []string{"assault", "shotgun"} {
@@ -167,4 +168,38 @@ func (b *Bot) buyStruct(w *sim.World, def string) bool {
 		}
 	}
 	return false
+}
+
+// spendRest burns leftover money on whatever is still useful.
+func (b *Bot) spendRest(w *sim.World) {
+	p := w.Players[b.Pid]
+	var offence []string
+	for _, s := range w.Cfg.Structs {
+		switch s.Kind {
+		case balance.SWeapon, balance.SAA, balance.SBunker:
+			offence = append(offence, s.ID)
+		}
+	}
+	for try := 0; try < 60 && p.Money >= 100; try++ {
+		switch b.rng.Intn(5) {
+		case 0, 1:
+			ids := make([]string, 0, len(w.Cfg.Units))
+			for _, u := range w.Cfg.Units {
+				ids = append(ids, u.ID)
+			}
+			b.buyUnit(w, ids[b.rng.Intn(len(ids))])
+		case 2:
+			b.buyStruct(w, offence[b.rng.Intn(len(offence))])
+		case 3:
+			items := []string{"fab", "kab", "geran"}
+			_ = w.BuyItem(b.Pid, items[b.rng.Intn(len(items))])
+		case 4:
+			b.buyWall(w)
+		}
+	}
+	for _, s := range w.StructsOf(b.Pid) {
+		if c := w.RepairCost(s); c > 0 && c < p.Money {
+			_ = w.Repair(b.Pid, s.ID)
+		}
+	}
 }

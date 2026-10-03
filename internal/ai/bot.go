@@ -5,6 +5,7 @@ package ai
 import (
 	"math"
 	"sort"
+	"time"
 
 	"svinovoyna/internal/balance"
 	"svinovoyna/internal/sim"
@@ -24,6 +25,9 @@ type Bot struct {
 	walks    int
 	advances int
 	planned  bool
+	planning bool
+	jobs     []func() *action
+	jobsBest *action
 }
 
 // New creates a bot for a seat.
@@ -106,7 +110,11 @@ func (b *Bot) Think(w *sim.World) []sim.Command {
 	}
 	if w.Cfg.TurnMode == balance.TurnSimultaneous {
 		if w.Stage == sim.StagePlan && w.Plans[b.Pid] == nil {
-			if a := b.plan(w, true, true); a != nil && a.score > 12 {
+			pa, done := b.stepPlan(w, true, true, planBudget)
+			if !done {
+				return out
+			}
+			if a := pa; a != nil && a.score > 12 {
 				c := sim.Command{Player: b.Pid, Type: sim.CmdPlan, Weapon: a.weapon, Angle: a.angle, Power: a.power, X: a.tx, Flag: true, ID: -1}
 				if a.kind == "unit" {
 					c.Def, c.ID = "unit", a.unit
@@ -131,6 +139,8 @@ func (b *Bot) Think(w *sim.World) []sim.Command {
 		b.walk = 0
 		b.walks = 0
 		b.advances = 0
+		b.planning = false
+		b.jobs = nil
 	}
 	if b.delay > 0 {
 		b.delay--
@@ -147,7 +157,10 @@ func (b *Bot) Think(w *sim.World) []sim.Command {
 		return out
 	}
 	au, as := b.allowed(w)
-	a := b.plan(w, au, as)
+	a, done := b.stepPlan(w, au, as, planBudget)
+	if !done {
+		return out
+	}
 	if a == nil || a.score < 12 {
 		if b.walks < 14 && w.TurnTimer > 9 && au && w.SelUnit >= 0 {
 			if dir := b.approachDir(w); dir != 0 {
@@ -214,21 +227,23 @@ func (b *Bot) approachDir(w *sim.World) int {
 // plan evaluates every available action and returns the best.
 func (b *Bot) plan(w *sim.World, allowUnit, allowStruct bool) *action {
 	var best *action
-	consider := func(a *action) {
-		if a == nil {
-			return
-		}
-		if best == nil || a.score > best.score {
+	for _, job := range b.planJobs(w, allowUnit, allowStruct) {
+		if a := job(); a != nil && (best == nil || a.score > best.score) {
 			best = a
 		}
 	}
+	return best
+}
+
+// planJobs splits planning into small independent evaluations so that the
+// game can spread them over several frames (see stepPlan).
+func (b *Bot) planJobs(w *sim.World, allowUnit, allowStruct bool) []func() *action {
+	var jobs []func() *action
 	if allowUnit {
-		cands := w.UnitsOf(b.Pid)
-		if w.Cfg.TurnMode != balance.TurnSimultaneous && w.SelUnit >= 0 {
-			// only the selected unit and (limited) others: evaluate all to find the best actor
-		}
-		for _, u := range cands {
+		for _, u := range w.UnitsOf(b.Pid) {
+			u := u
 			for _, wid := range w.Cfg.U(u.Def).Weapons {
+				wid := wid
 				if w.UnitAmmoLeft(u, wid) == 0 {
 					continue
 				}
@@ -236,47 +251,80 @@ func (b *Bot) plan(w *sim.World, allowUnit, allowStruct bool) *action {
 				if wd == nil || wd.Kind == balance.KindMine || wd.Kind == balance.KindRepair {
 					continue
 				}
-				muzzle := Vec{X: u.Pos.X, Y: u.Pos.Y - sim.UnitH*0.6}
-				a := b.evalWeapon(w, wd, muzzle, u.ID, -1, u.Pos.X)
-				if a != nil {
-					a.kind, a.unit, a.weapon = "unit", u.ID, wid
-					a.score *= 1.0
-					consider(a)
-				}
+				jobs = append(jobs, func() *action {
+					if !u.Alive {
+						return nil
+					}
+					muzzle := Vec{X: u.Pos.X, Y: u.Pos.Y - sim.UnitH*0.6}
+					a := b.evalWeapon(w, wd, muzzle, u.ID, -1, u.Pos.X)
+					if a != nil {
+						a.kind, a.unit, a.weapon = "unit", u.ID, wid
+					}
+					return a
+				})
 			}
 		}
 	}
 	if allowStruct && w.HasHQ(b.Pid) {
 		for _, s := range w.StructsOf(b.Pid) {
+			s := s
 			d := w.Cfg.S(s.Def)
 			if d.Kind != balance.SWeapon || s.Ammo <= 0 {
 				continue
 			}
 			wd := w.Cfg.W(d.Weapon)
-			a := b.evalWeapon(w, wd, w.StructMuzzle(s), -1, s.ID, w.StructCenter(s).X)
-			if a != nil {
-				a.kind, a.structID, a.weapon = "struct", s.ID, d.Weapon
-				a.angle = sim.ClampStructAim(a.angle)
-				consider(a)
-			}
+			jobs = append(jobs, func() *action {
+				if !s.Alive {
+					return nil
+				}
+				a := b.evalWeapon(w, wd, w.StructMuzzle(s), -1, s.ID, w.StructCenter(s).X)
+				if a != nil {
+					a.kind, a.structID, a.weapon = "struct", s.ID, d.Weapon
+					a.angle = sim.ClampStructAim(a.angle)
+				}
+				return a
+			})
 		}
 		hq := w.Structs[w.Players[b.Pid].HQ]
 		for _, id := range []string{"fab", "kab", "geran"} {
+			id := id
 			if w.Players[b.Pid].Items[id] <= 0 {
 				continue
 			}
 			wd := w.Cfg.W(id)
-			a := b.evalWeapon(w, wd, w.StructMuzzle(hq), -1, -1, w.StructCenter(hq).X)
-			if a != nil {
-				a.kind, a.weapon = "item", id
-				consider(a)
-			}
+			jobs = append(jobs, func() *action {
+				a := b.evalWeapon(w, wd, w.StructMuzzle(hq), -1, -1, w.StructCenter(hq).X)
+				if a != nil {
+					a.kind, a.weapon = "item", id
+				}
+				return a
+			})
 		}
 	}
-	if best != nil && w.Cfg.TurnMode == balance.TurnClassic && best.kind == "unit" {
-		_ = best
+	return jobs
+}
+
+// stepPlan advances (or starts) incremental planning within a time budget.
+// It returns done=true with the best action (possibly nil) when finished.
+func (b *Bot) stepPlan(w *sim.World, allowUnit, allowStruct bool, budget time.Duration) (*action, bool) {
+	if !b.planning {
+		b.planning = true
+		b.jobs = b.planJobs(w, allowUnit, allowStruct)
+		b.jobsBest = nil
 	}
-	return best
+	start := time.Now()
+	for len(b.jobs) > 0 && time.Since(start) < budget {
+		job := b.jobs[0]
+		b.jobs = b.jobs[1:]
+		if a := job(); a != nil && (b.jobsBest == nil || a.score > b.jobsBest.score) {
+			b.jobsBest = a
+		}
+	}
+	if len(b.jobs) > 0 {
+		return nil, false
+	}
+	b.planning = false
+	return b.jobsBest, true
 }
 
 // aaDiscount estimates how likely enemy air defence is to stop an air weapon aimed at x.
@@ -398,7 +446,7 @@ func (b *Bot) evalBallistic(w *sim.World, wd *balance.Weapon, muzzle Vec, unit, 
 	} else {
 		dirs = []float64{1}
 	}
-	if wd.Gravity < 0.1 {
+	if wd.Gravity <= 0.1 {
 		// flat trajectory weapons: aim straight, scan small corrections
 		for _, t := range ts {
 			base := math.Atan2(t.pos.Y-muzzle.Y, t.pos.X-muzzle.X)
@@ -547,3 +595,7 @@ func (b *Bot) advanceCandidate(w *sim.World) (*sim.Unit, int) {
 	}
 	return nil, 0
 }
+
+// planBudget is how much CPU one game tick may spend on bot planning, so the
+// UI never freezes while a bot "thinks".
+var planBudget = 3 * time.Millisecond

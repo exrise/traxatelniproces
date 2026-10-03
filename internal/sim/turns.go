@@ -291,14 +291,18 @@ func (w *World) stepBattle() {
 			w.endTurn()
 		}
 	case StageRetreat:
-		w.RetreatTime -= Dt
-		if w.RetreatTime <= 0 {
+		// the clock for running to cover only ticks once the shot has landed
+		w.SettleT += Dt
+		if !w.ProjectilesBusy() {
+			w.RetreatTime -= Dt
+		}
+		if w.RetreatTime <= 0 || w.SettleT > 30 {
 			w.endTurn()
 		}
 	case StageSettle:
 		w.SettleT += Dt
 		quiet := !w.ProjectilesBusy() && w.UnitsSettled() && w.StructsSettled()
-		if (quiet && w.SettleT > 0.8) || w.SettleT > 40 {
+		if (quiet && w.SettleT > 0.8) || w.SettleT > 20 {
 			w.finishTurn()
 		}
 	}
@@ -368,7 +372,7 @@ func (w *World) stepSimultaneous() {
 	case StageResolve:
 		w.SettleT += Dt
 		quiet := !w.ProjectilesBusy() && w.UnitsSettled() && w.StructsSettled()
-		if (quiet && w.SettleT > 1.0) || w.SettleT > 40 {
+		if (quiet && w.SettleT > 1.0) || w.SettleT > 20 {
 			for _, p := range w.Players {
 				if w.PlayerAlive(p.ID) {
 					w.captureCheck(p.ID)

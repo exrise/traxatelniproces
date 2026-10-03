@@ -65,7 +65,7 @@ func (w *World) advance(p *Proj, bounce bool) bool {
 	for i := 0; i < n; i++ {
 		prev := p.Pos
 		p.Pos = p.Pos.Add(step)
-		if p.Pos.X < -400 || p.Pos.X > float64(w.Terr.W)+400 || p.Pos.Y > MapH+300 {
+		if p.Pos.X < -400 || p.Pos.X > float64(w.Terr.W)+400 || p.Pos.Y > MapH+300 || p.Pos.Y < -2600 {
 			p.Alive = false
 			return false
 		}
@@ -147,6 +147,10 @@ func (w *World) stepProj(p *Proj) {
 		return
 	}
 	p.Age += Dt
+	if p.Age > 25 && p.Kind != PMine {
+		p.Alive = false // nothing legitimate flies this long
+		return
+	}
 	g := w.Cfg.GravityPx
 	switch p.Kind {
 	case PShell, PRocket:

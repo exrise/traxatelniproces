@@ -24,12 +24,9 @@ func (w *World) stepUnit(u *Unit) {
 		u.Hurt -= Dt
 	}
 	if !w.unitBodyFree(u.Pos.X, u.Pos.Y) {
-		// pushed into something (falling structure, build-up): climb out
-		for k := 1; k <= 40; k++ {
-			if w.unitBodyFree(u.Pos.X, u.Pos.Y-float64(k)) {
-				u.Pos.Y -= float64(k)
-				break
-			}
+		w.unstick(u)
+		if !u.Alive {
+			return
 		}
 	}
 	ground := w.unitOnGround(u.Pos.X, u.Pos.Y)
@@ -59,6 +56,13 @@ func (w *World) stepUnit(u *Unit) {
 		}
 		u.Ground = false
 		u.Vel.Y += w.Cfg.GravityPx * Dt
+		// a little air control so jumps can clear walls
+		if u.Walk != 0 && w.unitCanAct(u) {
+			t := float64(u.Walk) * w.Cfg.UnitSpeed * 1.6
+			if u.Vel.X*float64(u.Walk) < math.Abs(t) {
+				u.Vel.X = t
+			}
+		}
 	}
 	if u.Vel.X != 0 || u.Vel.Y != 0 {
 		w.moveUnitBy(u, u.Vel.Mul(Dt))
@@ -100,7 +104,7 @@ func (w *World) walkUnit(u *Unit, dx float64) bool {
 			moved = true
 		} else {
 			climbed := false
-			for k := 1; k <= 7; k++ {
+			for k := 1; k <= 8; k++ {
 				if w.unitBodyFree(nx, u.Pos.Y-float64(k)) {
 					u.Pos.X, u.Pos.Y = nx, u.Pos.Y-float64(k)
 					climbed, moved = true, true
@@ -138,7 +142,7 @@ func (w *World) moveUnitBy(u *Unit, d Vec) {
 				u.Pos.X = nx
 			} else {
 				ok := false
-				for k := 1; k <= 3; k++ {
+				for k := 1; k <= 5; k++ {
 					if w.unitBodyFree(nx, u.Pos.Y-float64(k)) {
 						u.Pos.X, u.Pos.Y = nx, u.Pos.Y-float64(k)
 						ok = true
@@ -146,7 +150,11 @@ func (w *World) moveUnitBy(u *Unit, d Vec) {
 					}
 				}
 				if !ok {
-					u.Vel.X *= -0.25
+					if math.Abs(u.Vel.X) > 220 {
+						u.Vel.X *= -0.3
+					} else {
+						u.Vel.X = 0
+					}
 					sx = 0
 				}
 			}
@@ -177,7 +185,9 @@ func (w *World) knock(u *Unit, imp Vec) {
 	u.Vel = u.Vel.Add(imp)
 	if imp.Y < 0 || imp.Len() > 40 {
 		u.Ground = false
-		u.Pos.Y -= 2
+		if w.unitBodyFree(u.Pos.X, u.Pos.Y-2) {
+			u.Pos.Y -= 2
+		}
 		if u.FallFrom == 0 {
 			u.FallFrom = u.Pos.Y
 		}
@@ -189,7 +199,7 @@ func (w *World) jumpUnit(u *Unit) {
 	if !u.Ground {
 		return
 	}
-	u.Vel = Vec{float64(u.Face) * 120, -300}
+	u.Vel = Vec{float64(u.Face) * 130, -330}
 	u.Ground = false
 	u.Pos.Y -= 2
 	u.FallFrom = u.Pos.Y
@@ -235,4 +245,59 @@ func (w *World) settleStructs() {
 			w.emit(Event{Type: EvExplosion, Pos: Vec{w.StructCenter(s).X, float64((s.CY + d.H) * Cell)}, R: 14, F: 0})
 		}
 	}
+}
+
+// bodyCols are the sampled columns of a unit's collision body (9 px wide so
+// pigs fit into narrow craters and gaps; the visible sprite is wider).
+var bodyCols = [...]float64{-4, -2, 0, 2, 4}
+
+// unitBodyFree tells whether a unit standing at (x,y) overlaps nothing. The body
+// occupies rows y-UnitH+1 .. y. It is consistent with unitOnGround: a unit may move
+// down one pixel exactly when it is not on the ground.
+func (w *World) unitBodyFree(x, y float64) bool {
+	for fy := 0; fy < UnitH; fy++ {
+		py := y - float64(fy)
+		for _, dx := range bodyCols {
+			if w.SolidPx(x+dx, py) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// unitOnGround: something solid directly below the feet.
+func (w *World) unitOnGround(x, y float64) bool {
+	for _, dx := range bodyCols {
+		if w.SolidPx(x+dx, y+1) {
+			return true
+		}
+	}
+	return false
+}
+
+// unstick moves an embedded unit to the nearest free spot (spiral search),
+// falling back to the surface above it, and kills it only as a last resort.
+func (w *World) unstick(u *Unit) {
+	for r := 1; r <= 70; r++ {
+		fr := float64(r)
+		for _, d := range [][2]float64{{0, -fr}, {fr, 0}, {-fr, 0}, {fr, -fr}, {-fr, -fr}, {0, fr}} {
+			nx, ny := u.Pos.X+d[0], u.Pos.Y+d[1]
+			if ny > WaterY {
+				continue
+			}
+			if w.unitBodyFree(nx, ny) {
+				u.Pos = Vec{nx, ny}
+				u.Vel = Vec{}
+				return
+			}
+		}
+	}
+	sy := float64(w.Terr.SurfaceY(int(u.Pos.X), 0)) - 1
+	if sy > 0 && sy < WaterY && w.unitBodyFree(u.Pos.X, sy) {
+		u.Pos = Vec{u.Pos.X, sy}
+		u.Vel = Vec{}
+		return
+	}
+	w.killUnit(u, -1, "завяз")
 }

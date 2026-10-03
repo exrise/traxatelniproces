@@ -358,3 +358,41 @@ func TestAirstrikeNeedsStockAndSpotterHelps(t *testing.T) {
 		t.Fatalf("KAB missed the HQ completely (even without a spotter it should be close)")
 	}
 }
+
+func TestCanRunAfterShooting(t *testing.T) {
+	w, _ := battleWith(t, "", "mortar", "assault")
+	var u *Unit
+	for _, x := range w.UnitsOf(0) {
+		if x.Def == "mortar" {
+			u = x
+		}
+	}
+	w.Apply(Command{Player: 0, Type: CmdSelectUnit, ID: u.ID})
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "mortar", Angle: -1.2, Power: 0.8}); err != nil {
+		t.Fatal(err)
+	}
+	if w.Stage != StageRetreat {
+		t.Fatalf("expected retreat stage after shooting, got %d", w.Stage)
+	}
+	// the shell is still in the air: the retreat clock must not run yet
+	t0 := w.RetreatTime
+	run(w, 0.5)
+	if w.ProjectilesBusy() && w.RetreatTime != t0 {
+		t.Fatalf("retreat clock ran while the shell was flying")
+	}
+	x0 := u.Pos.X
+	w.Apply(Command{Player: 0, Type: CmdWalk, Dir: -1})
+	run(w, 2)
+	if x0-u.Pos.X < 40 {
+		t.Fatalf("pig did not run after shooting (moved %.0f px)", x0-u.Pos.X)
+	}
+	// other units must stay put
+	if err := w.Apply(Command{Player: 0, Type: CmdSelectUnit, ID: w.UnitsOf(0)[1].ID}); err == nil {
+		t.Fatal("switching units after the shot must be refused in Classic mode")
+	}
+	// the turn passes on eventually
+	run(w, 30)
+	if w.Cur == 0 && w.Stage != StageActive {
+		t.Fatalf("turn stuck: cur=%d stage=%d", w.Cur, w.Stage)
+	}
+}

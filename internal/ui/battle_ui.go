@@ -251,6 +251,9 @@ func (b *BattleUI) Update(a *App) {
 	b.buildOpts(me)
 	u, s := b.actors()
 
+	if b.squadClick(a, me, send) {
+		return
+	}
 	// selection
 	if a.Click && !b.overUI(a) && !b.charging {
 		wp := cam.ToWorld(float64(a.MX), float64(a.MY))
@@ -266,10 +269,10 @@ func (b *BattleUI) Update(a *App) {
 		}
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyTab) {
-		b.cycleUnit(me, send)
+		b.cycleUnit(me, dirFor(ebiten.IsKeyPressed(ebiten.KeyShift)), send)
 	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
-		b.cycleStruct(me, send)
+		b.cycleStruct(me, dirFor(ebiten.IsKeyPressed(ebiten.KeyShift)), send)
 	}
 	for i := range b.opts {
 		if inpututil.IsKeyJustPressed(ebiten.Key1+ebiten.Key(i)) && b.opts[i].ammo != 0 {
@@ -379,6 +382,9 @@ func (b *BattleUI) overUI(a *App) bool {
 	if a.MY > ScreenH-120 || a.MY < 50 {
 		return true
 	}
+	if b.overSquad(a, b.m.w.Cur) || (b.m.w.Cfg.TurnMode == balance.TurnSimultaneous && b.overSquad(a, b.m.Me())) {
+		return true
+	}
 	if a.In(image.Rect(ScreenW-290, ScreenH-170, ScreenW, ScreenH)) {
 		return true
 	}
@@ -404,46 +410,6 @@ func (b *BattleUI) unitAt(pid int, wp sim.Vec) *sim.Unit {
 		}
 	}
 	return nil
-}
-
-func (b *BattleUI) cycleUnit(me int, send func(sim.Command)) {
-	w := b.m.w
-	us := w.UnitsOf(me)
-	if len(us) == 0 {
-		return
-	}
-	next := us[0].ID
-	for _, u := range us {
-		if u.ID > w.SelUnit {
-			next = u.ID
-			break
-		}
-	}
-	send(sim.Command{Type: sim.CmdSelectUnit, ID: next})
-	b.weapon = ""
-}
-
-func (b *BattleUI) cycleStruct(me int, send func(sim.Command)) {
-	w := b.m.w
-	var ids []int
-	for _, s := range w.StructsOf(me) {
-		if w.Cfg.S(s.Def).Kind == balance.SWeapon && s.Ammo > 0 {
-			ids = append(ids, s.ID)
-		}
-	}
-	if len(ids) == 0 {
-		b.flash("Нет готовых орудий")
-		return
-	}
-	next := ids[0]
-	for _, id := range ids {
-		if id > w.SelStruct {
-			next = id
-			break
-		}
-	}
-	send(sim.Command{Type: sim.CmdSelectStruct, ID: next})
-	b.weapon = ""
 }
 
 func (b *BattleUI) droneAlive(me int) bool {
@@ -487,6 +453,19 @@ func (b *BattleUI) updatePlan(a *App, me int) {
 	}
 	b.buildOpts(me)
 	m.view.SelUnit, m.view.SelStruct = b.planUnit, b.planStruct
+	if a.Click {
+		for _, r := range b.squadRows(me) {
+			if a.In(r.r) {
+				if r.isUnit {
+					b.planUnit, b.planStruct = r.id, -1
+				} else {
+					b.planStruct = r.id
+				}
+				b.weapon = ""
+				return
+			}
+		}
+	}
 	if a.Click && !b.overUI(a) && !b.charging {
 		wp := cam.ToWorld(float64(a.MX), float64(a.MY))
 		if cu := b.unitAt(me, wp); cu != nil {
@@ -574,7 +553,7 @@ func (b *BattleUI) autoCamera(a *App, me int) {
 		tp := follow.Pos
 		// keep the ground in view when a projectile arcs high
 		gx := int(math.Max(0, math.Min(float64(w.Terr.W-1), tp.X)))
-		if minY := float64(w.Terr.SurfaceY(gx, 0)) - 330/cam.Zoom - 120; tp.Y < minY {
+		if minY := float64(w.Terr.SurfaceY(gx, 0)) - 230/cam.Zoom; tp.Y < minY {
 			tp.Y = minY
 		}
 		cam.CenterOn(tp, 0.10)
@@ -586,6 +565,11 @@ func (b *BattleUI) autoCamera(a *App, me int) {
 		return
 	}
 	if b.camManual > 0 {
+		return
+	}
+	if w.Stage == sim.StageRetreat && w.FiredUnit >= 0 && w.FiredUnit < len(w.Units) && w.Units[w.FiredUnit].Alive {
+		fu := w.Units[w.FiredUnit]
+		cam.CenterOn(sim.Vec{X: fu.Pos.X, Y: fu.Pos.Y - 40}, 0.06)
 		return
 	}
 	if b.focusT > 0 {
@@ -625,6 +609,16 @@ func (b *BattleUI) Draw(a *App, dst *ebiten.Image) {
 	b.drawMini(a, dst)
 	if mine && (w.Stage == sim.StageActive || w.Stage == sim.StageRetreat || w.Stage == sim.StagePlan) {
 		b.drawWeaponBar(a, dst, me)
+		b.drawSquad(a, dst, me)
+		if w.Stage == sim.StageRetreat {
+			msg := "Выстрел сделан — отступай! A/D — бежать, W — прыжок"
+			if !w.ProjectilesBusy() {
+				msg += fmt.Sprintf("  (%.0f с)", math.Ceil(math.Max(0, w.RetreatTime)))
+			}
+			a.TextCenter(dst, msg, float64(ScreenW)/2, 84, 24, colGold, true)
+		} else if w.Stage == sim.StageActive && w.Cfg.TurnMode != balance.TurnSimultaneous {
+			a.TextCenter(dst, "Выбери юнита слева или Tab · A/D — идти · ЛКМ — огонь", float64(ScreenW)/2, 84, 18, color.RGBA{225, 232, 245, 200}, false)
+		}
 		if w.Stage != sim.StagePlan {
 			b.endBtn.Draw(a, dst)
 		}
@@ -799,8 +793,8 @@ func (b *BattleUI) drawWeaponBar(a *App, dst *ebiten.Image, me int) {
 		a.Text(dst, fmt.Sprintf("боезапас: %d", s.Ammo), px, py+22, 17, colGold)
 	}
 
-	a.Text(dst, "A/D ход • W прыжок • Tab юнит • Q орудие", px, py+44, 14, colDim)
-	a.Text(dst, "ЛКМ огонь (держи — сила) • ПКМ камера • T траектория", px, py+62, 14, colDim)
+	a.Text(dst, "Tab/Shift+Tab — юнит • Q — орудие", px, py+44, 14, colGold)
+	a.Text(dst, "A/D — идти • W — прыжок • ЛКМ — огонь", px, py+62, 14, colDim)
 }
 
 func (b *BattleUI) drawAim(a *App, dst *ebiten.Image, me int) {
@@ -925,4 +919,186 @@ func (b *BattleUI) drawMini(a *App, dst *ebiten.Image) {
 	}
 	cam := &m.view.Cam
 	a.Border(dst, float64(r.Min.X)+cam.X*sx, float64(r.Min.Y)+(cam.Y-380)*sy, ScreenW/cam.Zoom*sx, ScreenH/cam.Zoom*sy, 1, color.RGBA{255, 255, 255, 220})
+}
+
+// cycleUnit selects the next (dir=1) or previous (dir=-1) living unit.
+func (b *BattleUI) cycleUnit(me int, dir int, send func(sim.Command)) {
+	w := b.m.w
+	us := w.UnitsOf(me)
+	if len(us) == 0 {
+		b.flash("Живых юнитов нет")
+		return
+	}
+	cur := -1
+	for i, u := range us {
+		if u.ID == w.SelUnit && w.SelStruct < 0 {
+			cur = i
+		}
+	}
+	next := us[(cur+dir+len(us)*2)%len(us)].ID
+	if cur < 0 && dir < 0 {
+		next = us[len(us)-1].ID
+	}
+	send(sim.Command{Type: sim.CmdSelectUnit, ID: next})
+	b.weapon = ""
+}
+
+// cycleStruct selects the next ready weapon structure.
+func (b *BattleUI) cycleStruct(me int, dir int, send func(sim.Command)) {
+	w := b.m.w
+	var ids []int
+	for _, s := range w.StructsOf(me) {
+		if w.Cfg.S(s.Def).Kind == balance.SWeapon && s.Ammo > 0 {
+			ids = append(ids, s.ID)
+		}
+	}
+	if len(ids) == 0 {
+		b.flash("Нет орудий с боезапасом")
+		return
+	}
+	cur := -1
+	for i, id := range ids {
+		if id == w.SelStruct {
+			cur = i
+		}
+	}
+	next := ids[(cur+dir+len(ids)*2)%len(ids)]
+	send(sim.Command{Type: sim.CmdSelectStruct, ID: next})
+	b.weapon = ""
+}
+
+// ---- squad panel -------------------------------------------------------------
+
+type squadRow struct {
+	r      image.Rectangle
+	isUnit bool
+	id     int
+}
+
+// squadRows lays out the clickable list of my units and weapon structures.
+func (b *BattleUI) squadRows(me int) []squadRow {
+	w := b.m.w
+	var rows []squadRow
+	for _, u := range w.UnitsOf(me) {
+		rows = append(rows, squadRow{isUnit: true, id: u.ID})
+	}
+	for _, s := range w.StructsOf(me) {
+		if w.Cfg.S(s.Def).Kind == balance.SWeapon {
+			rows = append(rows, squadRow{id: s.ID})
+		}
+	}
+	h := 38
+	if avail := ScreenH - 84 - 140; len(rows)*h > avail && len(rows) > 0 {
+		h = avail / len(rows)
+	}
+	for i := range rows {
+		y := 108 + i*h
+		rows[i].r = image.Rect(10, y, 214, y+h-3)
+	}
+	return rows
+}
+
+func (b *BattleUI) squadRect(n int) image.Rectangle {
+	return image.Rect(6, 80, 218, 108+n*38+4)
+}
+
+func (b *BattleUI) overSquad(a *App, me int) bool {
+	if me < 0 {
+		return false
+	}
+	rows := b.squadRows(me)
+	for _, r := range rows {
+		if a.In(r.r) {
+			return true
+		}
+	}
+	return a.In(image.Rect(6, 80, 218, 108))
+}
+
+func (b *BattleUI) squadClick(a *App, me int, send func(sim.Command)) bool {
+	if !a.Click {
+		return false
+	}
+	for _, r := range b.squadRows(me) {
+		if a.In(r.r) {
+			if r.isUnit {
+				send(sim.Command{Type: sim.CmdSelectUnit, ID: r.id})
+			} else {
+				send(sim.Command{Type: sim.CmdSelectStruct, ID: r.id})
+			}
+			b.weapon = ""
+			return true
+		}
+	}
+	return false
+}
+
+func (b *BattleUI) drawSquad(a *App, dst *ebiten.Image, me int) {
+	w := b.m.w
+	rows := b.squadRows(me)
+	if len(rows) == 0 {
+		return
+	}
+	a.Rect(dst, 6, 80, 212, float64(rows[len(rows)-1].r.Max.Y-80+6), color.RGBA{12, 16, 26, 200})
+	a.TextB(dst, "Отряд  (Tab — сменить)", 12, 84, 15, colGold)
+	sel := -1
+	if au, as := b.actors(); as != nil {
+		sel = 1000 + as.ID
+	} else if au != nil {
+		sel = au.ID
+	}
+	teamCol := gfx.TeamColors[w.Players[me].Color%4]
+	for _, row := range rows {
+		r := row.r
+		key := row.id
+		if !row.isUnit {
+			key += 1000
+		}
+		bg := color.RGBA{30, 38, 60, 235}
+		if key == sel {
+			bg = color.RGBA{84, 98, 36, 245}
+		} else if a.In(r) {
+			bg = color.RGBA{48, 62, 98, 245}
+		}
+		a.Rect(dst, float64(r.Min.X), float64(r.Min.Y), float64(r.Dx()), float64(r.Dy()), bg)
+		if key == sel {
+			a.Border(dst, float64(r.Min.X)+0.5, float64(r.Min.Y)+0.5, float64(r.Dx())-1, float64(r.Dy())-1, 2, color.RGBA{255, 230, 120, 255})
+		}
+		ih := float64(r.Dy() - 6)
+		if row.isUnit {
+			u := w.Units[row.id]
+			img := b.m.view.pigImage(me, u.Def, 0, false)
+			op := &ebiten.DrawImageOptions{}
+			sc := math.Min(1.3, ih/float64(gfx.PigH))
+			op.GeoM.Scale(sc, sc)
+			op.GeoM.Translate(float64(r.Min.X)+4, float64(r.Min.Y)+3)
+			dst.DrawImage(img, op)
+			a.Text(dst, w.Cfg.U(u.Def).Name, float64(r.Min.X)+38, float64(r.Min.Y)+1, 15, colText)
+			frac := u.HP / u.MaxHP
+			a.Rect(dst, float64(r.Min.X)+38, float64(r.Max.Y)-9, 150, 5, color.RGBA{50, 20, 20, 255})
+			a.Rect(dst, float64(r.Min.X)+38, float64(r.Max.Y)-9, 150*frac, 5, teamCol)
+			if w.UnitActed && w.FiredUnit == u.ID {
+				a.Text(dst, "✓", float64(r.Max.X)-18, float64(r.Min.Y)+2, 16, colGood)
+			}
+		} else {
+			s := w.Structs[row.id]
+			d := w.Cfg.S(s.Def)
+			img := b.m.a.Img("s_"+s.Def, func() *image.RGBA { return gfx.StructSprite(s.Def, d.W, d.H) })
+			bw, bh := float64(img.Bounds().Dx()), float64(img.Bounds().Dy())
+			sc := math.Min((ih+4)/bh, 30/bw)
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Scale(sc, sc)
+			op.GeoM.Translate(float64(r.Min.X)+4, float64(r.Min.Y)+3)
+			dst.DrawImage(img, op)
+			a.Text(dst, d.Name, float64(r.Min.X)+38, float64(r.Min.Y)+1, 15, colText)
+			a.Text(dst, fmt.Sprintf("боезапас: %d", s.Ammo), float64(r.Min.X)+38, float64(r.Max.Y)-18, 13, colGold)
+		}
+	}
+}
+
+func dirFor(shift bool) int {
+	if shift {
+		return -1
+	}
+	return 1
 }

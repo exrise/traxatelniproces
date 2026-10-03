@@ -152,7 +152,7 @@ func (w *World) Apply(c Command) error {
 	switch c.Type {
 	case CmdSelectUnit:
 		if w.Stage != StageActive || w.UnitActed && w.Cfg.TurnMode == balance.TurnClassic || w.StructActed && w.Cfg.TurnMode == balance.TurnClassic {
-			return ErrAction
+			return ErrActed
 		}
 		if c.ID < 0 || c.ID >= len(w.Units) || !w.Units[c.ID].Alive || w.Units[c.ID].Owner != pid {
 			return ErrUnknown
@@ -162,14 +162,14 @@ func (w *World) Apply(c Command) error {
 		return nil
 	case CmdSelectStruct:
 		if w.Stage != StageActive {
-			return ErrAction
+			return ErrActed
 		}
 		if c.ID < 0 || c.ID >= len(w.Structs) || !w.Structs[c.ID].Alive || w.Structs[c.ID].Owner != pid ||
 			w.Cfg.S(w.Structs[c.ID].Def).Kind != balance.SWeapon {
 			return ErrUnknown
 		}
 		if w.Cfg.TurnMode == balance.TurnClassic && (w.UnitActed || w.StructActed) {
-			return ErrAction
+			return ErrActed
 		}
 		w.clearWalk()
 		w.SelStruct = c.ID
@@ -299,6 +299,7 @@ func (w *World) fireAction(pid int, c Command) error {
 		if w.FiredUnit >= 0 {
 			w.Stage = StageRetreat
 			w.RetreatTime = w.Cfg.RetreatTime
+			w.SettleT = 0
 		} else {
 			w.endTurn()
 		}

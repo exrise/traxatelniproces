@@ -157,7 +157,7 @@ func GenerateTerrain(n int, seed uint64) (*Terrain, []Vec) {
 	// random smooth components (shared "wavelength" bands)
 	type wave struct{ amp, freq, ph float64 }
 	var waves []wave
-	for _, b := range []struct{ amp, freq float64 }{{110, 1 / 520.0}, {55, 1 / 230.0}, {24, 1 / 95.0}, {9, 1 / 40.0}} {
+	for _, b := range []struct{ amp, freq float64 }{{82, 1 / 600.0}, {38, 1 / 280.0}, {12, 1 / 120.0}, {3, 1 / 50.0}} {
 		waves = append(waves, wave{b.amp * rng.Range(0.7, 1.15), b.freq, rng.Range(0, 2*math.Pi)})
 	}
 	height := make([]float64, W)

@@ -11,7 +11,7 @@ func Default() *Config {
 		RoundsPerBattle:   6,
 		AutoRounds:        true,
 		TurnTime:          45,
-		RetreatTime:       6,
+		RetreatTime:       8,
 		PlanTime:          30,
 		MaxHQHP:           750,
 		SuddenDeathBattle: 4,
@@ -53,7 +53,7 @@ func Default() *Config {
 			{ID: "dshk", Name: "ДШК", Kind: KindBurst, Damage: 16, Count: 14, Spread: 0.05, Range: 1050, BlockMul: 1.0, Ammo: 5},
 			{ID: "d30", Name: "Д-30", Kind: KindShell, Damage: 72, Radius: 58, Speed: 1300, Gravity: 1, WindK: 0.5, Crater: 1.1, BlockMul: 1.2, Ammo: 3},
 			{ID: "grad", Name: "БМ-21 «Град»", Kind: KindSalvo, Damage: 28, Radius: 36, Count: 10, Spread: 0.09, Speed: 1150, Gravity: 1, WindK: 0.5, Class: ClassRocket, Crater: 0.8, Ammo: 2},
-			{ID: "kornet", Name: "ПТРК «Корнет»", Kind: KindMissile, Damage: 115, Radius: 30, Speed: 820, Gravity: 0.05, Pierce: 0.9, BlockMul: 1.5, Class: ClassNone, Crater: 0.6, Ammo: 4},
+			{ID: "kornet", Name: "ПТРК «Корнет»", Kind: KindMissile, Damage: 115, Radius: 30, Speed: 820, Gravity: 0.1, Pierce: 0.9, BlockMul: 1.5, Class: ClassNone, Crater: 0.6, Ammo: 4},
 			{ID: "iskander", Name: "ПУ «Искандер»", Kind: KindBallis, Damage: 150, Radius: 82, Count: 1, Speed: 900, Class: ClassBallis, Crater: 1.2, BlockMul: 1.3, Ammo: 1},
 			{ID: "oreshnik", Name: "«Орешник»", Kind: KindMIRV, Damage: 125, Radius: 74, Count: 6, Spread: 150, Speed: 1100, Class: ClassOreshnik, Crater: 1.3, BlockMul: 1.3, Ammo: 1},
 

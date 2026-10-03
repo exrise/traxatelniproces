@@ -20,6 +20,7 @@ var (
 	ErrUnknown = errors.New("неизвестный объект")
 	ErrTurn    = errors.New("не твой ход")
 	ErrAction  = errors.New("действие недоступно")
+	ErrActed   = errors.New("в этот ход выстрел уже сделан — можно только отступать")
 )
 
 func (w *World) startBuild() {
@@ -144,22 +145,6 @@ func (w *World) placeStruct(pid int, def string, cx, cy int) error {
 	}
 	w.emit(Event{Type: EvBuild, Pos: w.StructCenter(s), A: pid})
 	return nil
-}
-
-// unitBodyFree tells whether a unit fits at pos.
-func (w *World) unitBodyFree(x, y float64) bool {
-	for _, fx := range []float64{-UnitW / 2, 0, UnitW / 2} {
-		for fy := 2.0; fy <= UnitH; fy += 4 {
-			if w.SolidPx(x+fx, y-fy) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func (w *World) unitOnGround(x, y float64) bool {
-	return w.SolidPx(x-UnitW/2+2, y+1) || w.SolidPx(x, y+1) || w.SolidPx(x+UnitW/2-2, y+1)
 }
 
 // dropUnitPos finds the resting position for a unit dropped from (x,y).

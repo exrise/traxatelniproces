@@ -22,6 +22,7 @@ func (a *App) loadSettings() {
 			a.Set.Port = s.Port
 		}
 		a.Set.LastIP = s.LastIP
+		a.Set.MusicOff = s.MusicOff
 		if s.Volume > 0 {
 			a.Set.Volume = s.Volume
 		}

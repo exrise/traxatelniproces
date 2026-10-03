@@ -38,6 +38,7 @@ type Settings struct {
 	Port       string
 	Volume     float64
 	Fullscreen bool
+	MusicOff   bool
 }
 
 // App is the root ebiten.Game.
@@ -117,6 +118,11 @@ func (a *App) Update() error {
 	a.Backspace = inpututil.IsKeyJustPressed(ebiten.KeyBackspace) || (inpututil.KeyPressDuration(ebiten.KeyBackspace) > 25 && a.tick%3 == 0)
 	a.EnterKey = inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeyNumpadEnter)
 	a.EscapeKey = inpututil.IsKeyJustPressed(ebiten.KeyEscape)
+	if inpututil.IsKeyJustPressed(ebiten.KeyM) && SetMusic != nil {
+		a.Set.MusicOff = !a.Set.MusicOff
+		SetMusic(!a.Set.MusicOff)
+		a.SaveSettings()
+	}
 	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
 	}
@@ -274,3 +280,6 @@ func shadowAlpha(c color.Color) uint8 {
 	}
 	return 200
 }
+
+// SetMusic is set by the audio package; it switches the background music.
+var SetMusic func(on bool)

@@ -343,7 +343,7 @@ func TestMineAndRepair(t *testing.T) {
 }
 
 func TestAirstrikeNeedsStockAndSpotterHelps(t *testing.T) {
-	w, _ := battleWith(t, "")
+	w, _ := battleWith(t, "", "assault")
 	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "kab", X: 1500}); err == nil {
 		t.Fatal("airstrike without stock must fail")
 	}

@@ -59,5 +59,5 @@ func (m *Menu) Draw(a *App, dst *ebiten.Image) {
 	for _, b := range m.buttons {
 		b.Draw(a, dst)
 	}
-	a.TextCenter(dst, "F11 — полный экран", ScreenW/2, ScreenH-34, 16, colDim, false)
+	a.TextCenter(dst, "F11 — полный экран   •   M — музыка вкл/выкл   •   F1 — справка в игре", ScreenW/2, ScreenH-34, 16, colDim, false)
 }

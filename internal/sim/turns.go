@@ -84,7 +84,7 @@ func (w *World) buildOrder() {
 	if len(alive) == 0 {
 		return
 	}
-	shift := (w.BattleNo - 1 + w.Round - 1) % len(alive)
+	shift := (int(w.Seed%uint64(len(alive))) + w.BattleNo - 1 + w.Round - 1) % len(alive)
 	for i := range alive {
 		w.Order = append(w.Order, alive[(i+shift)%len(alive)])
 	}

@@ -10,16 +10,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hajimehoshi/ebiten/v2/audio"
+	"bytes"
+
+	"github.com/ebitengine/oto/v3"
 )
 
 const rate = 44100
 
 var (
-	ctx     *audio.Context
+	ctx     *oto.Context
 	sounds  = map[string][]byte{}
 	mu      sync.Mutex
-	active  []*audio.Player
+	active  []*oto.Player
 	lastHit = map[string]time.Time{}
 	enabled bool
 )
@@ -30,7 +32,14 @@ func Init() {
 	if os.Getenv("SVINO_NOSOUND") != "" {
 		return
 	}
-	ctx = audio.NewContext(rate)
+	var ready chan struct{}
+	var err error
+	ctx, ready, err = oto.NewContext(&oto.NewContextOptions{SampleRate: rate, ChannelCount: 2, Format: oto.FormatSignedInt16LE})
+	if err != nil {
+		ctx = nil
+		return
+	}
+	<-ready
 	rng := rand.New(rand.NewSource(7))
 	sounds["boom"] = pcm(explosion(rng, 0.9, 1.0, 70))
 	sounds["boom_big"] = pcm(explosion(rng, 1.7, 1.3, 48))
@@ -47,6 +56,7 @@ func Init() {
 	sounds["splash"] = pcm(splash(rng))
 	sounds["jump"] = pcm(blip(420, 700, 0.12))
 	enabled = true
+	go StartMusic()
 }
 
 func pcm(mono []float64) []byte {
@@ -242,7 +252,7 @@ func Play(name string, vol float64) {
 	if len(active) > 28 {
 		return
 	}
-	p := ctx.NewPlayerFromBytes(data)
+	p := ctx.NewPlayer(bytes.NewReader(data))
 	p.SetVolume(math.Min(1, vol))
 	p.Play()
 	active = append(active, p)

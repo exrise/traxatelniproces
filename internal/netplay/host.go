@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -35,7 +36,7 @@ type Host struct {
 	started bool
 	in      chan InCmd
 	dropped []int
-	closed  bool
+	closed  atomic.Bool
 }
 
 // Listen starts accepting connections on port.
@@ -172,7 +173,7 @@ func (h *Host) drop(p *peer) {
 		h.dropped = append(h.dropped, p.seat)
 	}
 	h.mu.Unlock()
-	if !h.closed {
+	if !h.closed.Load() {
 		h.broadcastLobby()
 	}
 }
@@ -294,7 +295,7 @@ func (h *Host) Connected(seat int) bool {
 
 // Close shuts everything down.
 func (h *Host) Close() {
-	h.closed = true
+	h.closed.Store(true)
 	_ = h.ln.Close()
 	h.mu.Lock()
 	for _, p := range h.peers {

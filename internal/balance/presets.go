@@ -42,9 +42,9 @@ func Default() *Config {
 			{ID: "ak", Name: "АК-74", Kind: KindBurst, Damage: 10, Count: 8, Spread: 0.075, Range: 720},
 			{ID: "grenade", Name: "РГД-5", Kind: KindShell, Damage: 50, Radius: 46, Speed: 760, Gravity: 1, Fuse: 3, Crater: 0.8, Class: ClassNone},
 			{ID: "saiga", Name: "Сайга-12", Kind: KindPellets, Damage: 17, Count: 6, Spread: 0.24, Range: 280, Falloff: 0.8},
-			{ID: "svd", Name: "СВД", Kind: KindShot, Damage: 62, Count: 1, Spread: 0.004, Range: 1500},
-			{ID: "rpg", Name: "РПГ-7", Kind: KindShell, Damage: 66, Radius: 42, Speed: 950, Gravity: 0.35, WindK: 0.2, Pierce: 0.6, BlockMul: 1.5, Crater: 0.9},
-			{ID: "mortar", Name: "Миномёт 82 мм", Kind: KindShell, Damage: 62, Radius: 58, Speed: 1050, Gravity: 1, WindK: 0.7, Crater: 1.0},
+			{ID: "svd", Name: "СВД", Kind: KindShot, Damage: 75, Count: 1, Spread: 0.004, Range: 1500},
+			{ID: "rpg", Name: "РПГ-7", Kind: KindShell, Damage: 72, Radius: 42, Speed: 950, Gravity: 0.35, WindK: 0.2, Pierce: 0.6, BlockMul: 1.5, Crater: 0.9},
+			{ID: "mortar", Name: "Миномёт 82 мм", Kind: KindShell, Damage: 70, Radius: 62, Speed: 1050, Gravity: 1, WindK: 0.7, Crater: 1.0},
 			{ID: "fpv", Name: "FPV-дрон", Kind: KindDrone, Damage: 72, Radius: 36, Speed: 330, Flight: 9, Class: ClassDrone, Crater: 0.8},
 			{ID: "makarov", Name: "ПМ", Kind: KindBurst, Damage: 12, Count: 3, Spread: 0.06, Range: 420},
 			{ID: "tm62", Name: "Мина ТМ-62", Kind: KindMine, Damage: 85, Radius: 46, Ammo: 2, Crater: 0.7},
@@ -57,7 +57,7 @@ func Default() *Config {
 			{ID: "iskander", Name: "ПУ «Искандер»", Kind: KindBallis, Damage: 150, Radius: 82, Count: 1, Speed: 900, Class: ClassBallis, Crater: 1.2, BlockMul: 1.3, Ammo: 1},
 			{ID: "oreshnik", Name: "«Орешник»", Kind: KindMIRV, Damage: 125, Radius: 74, Count: 6, Spread: 150, Speed: 1100, Class: ClassOreshnik, Crater: 1.3, BlockMul: 1.3, Ammo: 1},
 
-			{ID: "fab", Name: "Авиаудар ФАБ-500", Kind: KindAirstrike, Damage: 90, Radius: 66, Count: 3, Spread: 90, Speed: 520, Gravity: 2, Class: ClassAir, Crater: 1.1, BlockMul: 1.2, Cost: 190},
+			{ID: "fab", Name: "Авиаудар ФАБ-500", Kind: KindAirstrike, Damage: 90, Radius: 66, Count: 3, Spread: 90, Speed: 520, Gravity: 2, Class: ClassAir, Crater: 1.1, BlockMul: 1.2, Cost: 160},
 			{ID: "kab", Name: "КАБ-1500", Kind: KindAirstrike, Damage: 230, Radius: 100, Count: 1, Spread: 10, Speed: 520, Gravity: 2, Class: ClassAir, Crater: 1.4, BlockMul: 1.4, Cost: 330},
 			{ID: "geran", Name: "«Герань»", Kind: KindGeran, Damage: 165, Radius: 68, Speed: 170, Flight: 14, Class: ClassDrone, Crater: 1.0, Cost: 140},
 		},
@@ -90,9 +90,9 @@ func Default() *Config {
 			{ID: "oreshnik", Name: "«Орешник»", Kind: SWeapon, Weapon: "oreshnik", Cost: 1600, W: 4, H: 2, HP: 140, Armor: 0.3, Blast: 0.2, Max: 1, Tier: 2, Desc: "6 боевых блоков. Раз за бой."},
 
 			{ID: "zu23", Name: "ЗУ-23-2", Kind: SAA, Cost: 140, W: 2, H: 2, HP: 80, Armor: 0.3, Blast: 0.2, Max: 4, AARange: 380, AAAmmo: 8,
-				AAHit: map[AAClass]float64{ClassDrone: 0.8, ClassAir: 0.5, ClassRocket: 0.25}, Desc: "Дёшево. Хорош против дронов."},
+				AAHit: map[AAClass]float64{ClassDrone: 0.8, ClassAir: 0.45, ClassRocket: 0.25}, Desc: "Дёшево. Хорош против дронов."},
 			{ID: "pantsir", Name: "Панцирь-С1", Kind: SAA, Cost: 420, W: 3, H: 3, HP: 150, Armor: 0.4, Blast: 0.3, Max: 3, Tier: 1, AARange: 520, AAAmmo: 10,
-				AAHit: map[AAClass]float64{ClassDrone: 0.85, ClassAir: 0.8, ClassRocket: 0.55, ClassOreshnik: 0.05}, Desc: "Универсальное ПВО."},
+				AAHit: map[AAClass]float64{ClassDrone: 0.85, ClassAir: 0.72, ClassRocket: 0.55, ClassOreshnik: 0.05}, Desc: "Универсальное ПВО."},
 			{ID: "s400", Name: "С-400", Kind: SAA, Cost: 850, W: 4, H: 3, HP: 200, Armor: 0.4, Blast: 0.3, Max: 1, Tier: 2, AARange: 950, AAAmmo: 6,
 				AAHit: map[AAClass]float64{ClassDrone: 0.25, ClassAir: 0.9, ClassRocket: 0.65, ClassBallis: 0.6, ClassOreshnik: 0.2}, Desc: "Дальнее ПВО против авиации и ракет."},
 			{ID: "reb", Name: "РЭБ", Kind: SJammer, Cost: 220, W: 2, H: 2, HP: 70, Armor: 0.2, Blast: 0.2, Max: 2, AARange: 450, AAAmmo: 99,
@@ -133,13 +133,21 @@ func Presets() []*Config {
 	rockets.StartMoney = 3600
 	rockets.BaseIncome = 1400
 	rockets.RoundsPerBattle = 5
+	rockets.SuddenDeathBattle = 3
+	rockets.SuddenDeathDmg = 70
+	rockets.MaxHQHP = 650
+	for i := range rockets.Structs {
+		if rockets.Structs[i].Kind == SHQ {
+			rockets.Structs[i].HP = 650
+		}
+	}
 	for i := range rockets.Structs {
 		s := &rockets.Structs[i]
 		if s.Kind == SAA {
 			for k, v := range s.AAHit {
-				s.AAHit[k] = min(0.95, v*1.15)
+				s.AAHit[k] = min(0.95, v*1.05)
 			}
-			s.AAAmmo += 4
+			s.AAAmmo += 2
 		}
 		if s.Tier > 1 {
 			s.Tier = 1
@@ -148,7 +156,7 @@ func Presets() []*Config {
 	for i := range rockets.Weapons {
 		w := &rockets.Weapons[i]
 		if w.Kind == KindGrad() || w.Kind == KindBallis || w.Kind == KindMIRV || w.Kind == KindMissile {
-			w.Damage *= 1.1
+			w.Damage *= 1.25
 		}
 	}
 

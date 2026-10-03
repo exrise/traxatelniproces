@@ -13,11 +13,16 @@ import (
 func main() {
 	sfx.Init()
 	ui.PlaySound = sfx.Play
+	ui.SetMusic = sfx.SetMusic
 	ebiten.SetWindowSize(1280, 720)
 	ebiten.SetWindowTitle("Свиновойна")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetTPS(60)
-	if err := ebiten.RunGame(ui.NewApp()); err != nil {
+	app := ui.NewApp()
+	if app.Set.MusicOff {
+		sfx.SetMusic(false)
+	}
+	if err := ebiten.RunGame(app); err != nil {
 		log.Fatal(err)
 	}
 }

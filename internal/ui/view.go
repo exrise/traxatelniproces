@@ -467,6 +467,16 @@ func (v *View) drawProj(dst *ebiten.Image, p *sim.Proj) {
 		a.Circle(dst, x+22*z*d, y-1*z, 3*z, color.RGBA{120, 200, 240, 255})
 		a.Circle(dst, x-32*z*d, y, 3*z, color.RGBA{255, 160, 60, 220})
 	case sim.PDrone:
+		if p.Phase == 1 { // guided missile (ПТУР)
+			dd := sim.Dir(p.Heading)
+			pr := sim.Vec{X: -dd.Y, Y: dd.X}
+			a.Line(dst, x-dd.X*12*z, y-dd.Y*12*z, x+dd.X*10*z, y+dd.Y*10*z, 4*z, color.RGBA{214, 218, 224, 255})
+			a.Line(dst, x+dd.X*6*z, y+dd.Y*6*z, x+dd.X*11*z, y+dd.Y*11*z, 4*z, color.RGBA{220, 70, 50, 255})
+			a.Line(dst, x-dd.X*10*z+pr.X*5*z, y-dd.Y*10*z+pr.Y*5*z, x-dd.X*13*z, y-dd.Y*13*z, 2*z, color.RGBA{150, 156, 166, 255})
+			a.Line(dst, x-dd.X*10*z-pr.X*5*z, y-dd.Y*10*z-pr.Y*5*z, x-dd.X*13*z, y-dd.Y*13*z, 2*z, color.RGBA{150, 156, 166, 255})
+			a.Circle(dst, x-dd.X*15*z, y-dd.Y*15*z, (3+2*math.Sin(v.clock*50))*z, color.RGBA{255, 190, 70, 235})
+			return
+		}
 		h := p.Heading
 		dd := sim.Dir(h)
 		a.Line(dst, x-dd.X*6*z, y-dd.Y*6*z, x+dd.X*6*z, y+dd.Y*6*z, 4*z, color.RGBA{40, 42, 48, 255})

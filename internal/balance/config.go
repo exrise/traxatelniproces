@@ -50,6 +50,7 @@ const (
 	KindDrone     WeaponKind = "drone"     // player-steered kamikaze drone
 	KindAirstrike WeaponKind = "airstrike" // plane drops bombs while crossing the map
 	KindGeran     WeaponKind = "geran"     // slow autonomous loitering drone
+	KindGuided    WeaponKind = "guided"    // missile steered by the player (ATGM)
 	KindMine      WeaponKind = "mine"      // placed mine
 	KindRepair    WeaponKind = "repair"    // engineer repair
 )
@@ -86,6 +87,7 @@ type Weapon struct {
 	Crater   float64    `json:"crater"`    // terrain crater radius multiplier (1 = Radius)
 	Class    AAClass    `json:"class"`     // air-defence classification of the projectile
 	Flight   float64    `json:"flight"`    // drone flight time (s)
+	Turn     float64    `json:"turn"`      // steering rate of drones / guided missiles (rad/s), 0 = default
 	Ammo     int        `json:"ammo"`      // shots per battle (structures); 0 = unlimited in-turn
 	Cost     int        `json:"cost"`      // price for consumables (airstrikes, mines)
 }
@@ -113,6 +115,7 @@ const (
 	SBunker StructKind = "bunker"
 	SNet    StructKind = "net" // anti-drone net
 	SJammer StructKind = "jammer"
+	SWindow StructKind = "window" // blocks enemy fire but is transparent to the owner team
 )
 
 // StructDef is a placeable structure. Size is in 16px grid cells.
@@ -297,7 +300,7 @@ func (c *Config) Validate() []string {
 		if s.W < 1 || s.H < 1 || s.HP <= 0 {
 			add("struct %s has bad size/hp", s.ID)
 		}
-		if s.Kind == SWeapon && c.W(s.Weapon) == nil {
+		if s.Armed() && c.W(s.Weapon) == nil {
 			add("struct %s uses unknown weapon %s", s.ID, s.Weapon)
 		}
 		if s.Kind == SHQ {
@@ -369,3 +372,6 @@ func (c *Config) RoundsFor(n int) int {
 	}
 	return r
 }
+
+// Armed reports whether the structure can be fired manually.
+func (s *StructDef) Armed() bool { return s.Kind == SWeapon || s.Weapon != "" }

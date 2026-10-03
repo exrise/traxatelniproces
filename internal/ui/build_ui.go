@@ -88,7 +88,7 @@ func (b *BuildUI) itemsForTab() []palItem {
 			case 2:
 				ok = s.Kind == balance.SAA || s.Kind == balance.SJammer
 			case 3:
-				ok = s.Kind == balance.SBlock || s.Kind == balance.SBunker || s.Kind == balance.SNet
+				ok = s.Kind == balance.SBlock || s.Kind == balance.SBunker || s.Kind == balance.SNet || s.Kind == balance.SWindow
 			case 4:
 				ok = s.Kind == balance.SEco
 			}
@@ -520,6 +520,10 @@ func (b *BuildUI) describe(it palItem) []string {
 				}
 			}
 			add("Перехват: %s", strings.Join(hs, ", "))
+			if d.Weapon != "" {
+				wd := cfg.W(d.Weapon)
+				add("Стреляет и вручную: урон %.0f ×%d, боезапас %d", wd.Damage, max(1, wd.Count), wd.Ammo)
+			}
 		case balance.SEco:
 			add("Доход: +$%d каждый твой ход", d.Income)
 		}

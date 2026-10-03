@@ -28,6 +28,7 @@ func (w *World) startBuild() {
 	w.BuildNo++
 	w.Projs = nil
 	w.Spawns = nil
+	w.Shots = nil
 	w.Cur = -1
 	w.SelUnit, w.SelStruct = -1, -1
 	for _, p := range w.Players {

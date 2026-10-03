@@ -40,7 +40,7 @@ func (w *World) projBlocked(p *Proj) bool {
 	if w.Terr.Solid(int(math.Floor(x)), int(math.Floor(y))) {
 		return true
 	}
-	if s := w.StructAtPx(x, y); s != nil && !(ownGhost(p) && s.Owner == p.Owner) {
+	if s := w.StructAtPx(x, y); s != nil && !(ownGhost(p) && s.Owner == p.Owner) && !w.passes(p.Owner, s) {
 		return true
 	}
 	for _, u := range w.Units {
@@ -110,6 +110,7 @@ func angDiff(a, b float64) float64 {
 }
 
 func (w *World) stepProjs() {
+	w.stepShots()
 	// delayed spawns
 	if len(w.Spawns) > 0 {
 		keep := w.Spawns[:0]
@@ -150,6 +151,13 @@ func (w *World) stepProj(p *Proj) {
 	if p.Age > 25 && p.Kind != PMine {
 		p.Alive = false // nothing legitimate flies this long
 		return
+	}
+	if p.Doom > 0 {
+		p.Doom -= Dt
+		if p.Doom <= 0 {
+			w.resolveDoom(p)
+			return
+		}
 	}
 	g := w.Cfg.GravityPx
 	switch p.Kind {
@@ -198,9 +206,13 @@ func (w *World) stepProj(p *Proj) {
 		}
 	case PDrone:
 		p.Flight -= Dt
+		turn := 3.2
+		if wd.Turn > 0 {
+			turn = wd.Turn
+		}
 		if p.Flight > 0 {
 			diff := angDiff(p.Heading, p.Steer)
-			p.Heading += clamp(diff, -3.2*Dt, 3.2*Dt)
+			p.Heading += clamp(diff, -turn*Dt, turn*Dt)
 			p.Vel = Dir(p.Heading).Mul(wd.Speed)
 		} else {
 			p.Vel.Y += g * Dt
@@ -298,7 +310,7 @@ func (w *World) stepGeran(p *Proj, wd *balance.Weapon) {
 
 // ProjectilesBusy reports whether anything is still flying or about to spawn.
 func (w *World) ProjectilesBusy() bool {
-	if len(w.Spawns) > 0 {
+	if len(w.Spawns) > 0 || len(w.Shots) > 0 {
 		return true
 	}
 	for _, p := range w.Projs {
@@ -339,4 +351,30 @@ func ownGhost(p *Proj) bool {
 		return p.Age < 0.6
 	}
 	return p.Age < 0.12
+}
+
+// stepShots fires the queued bullets of bursts whose time has come.
+func (w *World) stepShots() {
+	if len(w.Shots) == 0 {
+		return
+	}
+	keep := w.Shots[:0]
+	for _, q := range w.Shots {
+		if w.Time < q.At {
+			keep = append(keep, q)
+			continue
+		}
+		if q.Unit >= 0 && !w.Units[q.Unit].Alive {
+			continue // the shooter died: the rest of the burst is lost
+		}
+		wd := w.Cfg.W(q.Weapon)
+		if wd == nil {
+			continue
+		}
+		w.curWeapon = wd.ID
+		w.emit(Event{Type: EvShot, Pos: q.From, Text: wd.ID, F: q.Angle})
+		w.rayShot(q.From, q.Angle, wd, q.Owner, q.K, q.Unit, q.IgnoreStruct)
+		w.curWeapon = ""
+	}
+	w.Shots = keep
 }

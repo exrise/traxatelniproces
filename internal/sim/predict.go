@@ -28,7 +28,7 @@ func (w *World) blockedFast(p *Proj, bs []unitBox) bool {
 	if w.Terr.Solid(int(math.Floor(x)), int(math.Floor(y))) {
 		return true
 	}
-	if s := w.StructAtPx(x, y); s != nil && !(p.Age < 0.1 && s.Owner == p.Owner) {
+	if s := w.StructAtPx(x, y); s != nil && !(p.Age < 0.1 && s.Owner == p.Owner) && !w.passes(p.Owner, s) {
 		return true
 	}
 	for _, u := range bs {
@@ -72,7 +72,7 @@ func (w *World) PredictShell(from, vel Vec, wd *balance.Weapon, owner int) (Vec,
 }
 
 // TraceRay finds what a bullet fired from `from` at `ang` would hit first.
-func (w *World) TraceRay(from Vec, ang float64, maxD float64, ignoreUnit, ignoreStruct int) (Vec, *Unit, *Struct) {
+func (w *World) TraceRay(owner int, from Vec, ang float64, maxD float64, ignoreUnit, ignoreStruct int) (Vec, *Unit, *Struct) {
 	dir := Dir(ang)
 	for d := 0.0; d < maxD; d += 2 {
 		p := from.Add(dir.Mul(d))
@@ -87,7 +87,7 @@ func (w *World) TraceRay(from Vec, ang float64, maxD float64, ignoreUnit, ignore
 				return p, u, nil
 			}
 		}
-		if s := w.StructAtPx(p.X, p.Y); s != nil && s.ID != ignoreStruct {
+		if s := w.StructAtPx(p.X, p.Y); s != nil && s.ID != ignoreStruct && !w.passes(owner, s) {
 			return p, nil, s
 		}
 		if w.Terr.Solid(int(p.X), int(p.Y)) {

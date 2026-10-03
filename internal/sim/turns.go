@@ -40,14 +40,14 @@ func (w *World) startBattle() {
 	w.BattleNo++
 	w.Round = 1
 	w.BuildTimerOn = false
-	w.Projs, w.Spawns = nil, nil
+	w.Projs, w.Spawns, w.Shots = nil, nil, nil
 	for _, s := range w.Structs {
 		if !s.Alive {
 			continue
 		}
 		d := w.Cfg.S(s.Def)
 		s.AAAmmo = d.AAAmmo
-		if d.Kind == balance.SWeapon {
+		if d.Armed() {
 			s.Ammo = w.Cfg.W(d.Weapon).Ammo
 		}
 	}
@@ -84,7 +84,9 @@ func (w *World) buildOrder() {
 	if len(alive) == 0 {
 		return
 	}
-	shift := (int(w.Seed%uint64(len(alive))) + w.BattleNo - 1 + w.Round - 1) % len(alive)
+	// the order stays fixed during a battle (a b c a b c ...) and the first
+	// player rotates from battle to battle
+	shift := (int(w.Seed%uint64(len(alive))) + w.BattleNo - 1) % len(alive)
 	for i := range alive {
 		w.Order = append(w.Order, alive[(i+shift)%len(alive)])
 	}
@@ -205,6 +207,15 @@ func (w *World) nextTurn() {
 	w.FiredUnit = -1
 	w.SelStruct = -1
 	w.SelUnit = w.pickUnit(pid)
+	if w.SelUnit < 0 {
+		// no pigs left: start with the first gun that still has ammo
+		for _, s := range w.StructsOf(pid) {
+			if w.Cfg.S(s.Def).Armed() && s.Ammo > 0 {
+				w.SelStruct = s.ID
+				break
+			}
+		}
+	}
 	w.payIncome(pid)
 	w.emit(Event{Type: EvTurn, A: pid, B: w.Round})
 }
@@ -321,7 +332,7 @@ func (w *World) finishTurn() {
 
 func (w *World) hasWeaponStruct(pid int) bool {
 	for _, s := range w.Structs {
-		if s.Alive && s.Owner == pid && w.Cfg.S(s.Def).Kind == balance.SWeapon && s.Ammo > 0 {
+		if s.Alive && s.Owner == pid && w.Cfg.S(s.Def).Armed() && s.Ammo > 0 {
 			return true
 		}
 	}
@@ -421,7 +432,7 @@ func (w *World) resolvePlans() {
 			}
 		} else if pl.Struct >= 0 && pl.Struct < len(w.Structs) {
 			s := w.Structs[pl.Struct]
-			if !s.Alive || s.Owner != id || w.Cfg.S(s.Def).Kind != balance.SWeapon || s.Ammo <= 0 {
+			if !s.Alive || s.Owner != id || !w.Cfg.S(s.Def).Armed() || s.Ammo <= 0 {
 				continue
 			}
 			sp.Struct = s.ID

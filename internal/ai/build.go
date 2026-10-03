@@ -133,7 +133,7 @@ func (b *Bot) buyUnit(w *sim.World, def string) bool {
 }
 
 func (b *Bot) buyWall(w *sim.World) bool {
-	defs := []string{"sandbag", "concrete", "concrete", "armor", "sandbag"}
+	defs := []string{"sandbag", "concrete", "concrete", "armor", "sandbag", "window"}
 	def := defs[b.rng.Intn(len(defs))]
 	return b.buyStruct(w, def)
 }
@@ -159,7 +159,7 @@ func (b *Bot) buyStruct(w *sim.World, def string) bool {
 		e := math.Abs(float64(c)-center) / half
 		jitter := b.rng.Range(-0.18, 0.18)
 		switch d.Kind {
-		case balance.SBlock, balance.SNet:
+		case balance.SBlock, balance.SNet, balance.SWindow:
 			return -e + jitter // walls first at the edges
 		case balance.SAA, balance.SJammer:
 			return e*0.6 + jitter // near the middle, slightly spread
@@ -239,7 +239,7 @@ func (b *Bot) roofHQ(w *sim.World, layers int) {
 	cover(w.Structs[p.HQ], layers)
 	if b.Style == Turtle {
 		for _, s := range w.StructsOf(b.Pid) {
-			if k := w.Cfg.S(s.Def).Kind; k == balance.SWeapon || k == balance.SAA {
+			if def := w.Cfg.S(s.Def); def.Armed() || def.Kind == balance.SAA {
 				cover(s, 1)
 			}
 		}

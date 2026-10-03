@@ -269,7 +269,7 @@ func (b *Bot) planJobs(w *sim.World, allowUnit, allowStruct bool) []func() *acti
 		for _, s := range w.StructsOf(b.Pid) {
 			s := s
 			d := w.Cfg.S(s.Def)
-			if d.Kind != balance.SWeapon || s.Ammo <= 0 {
+			if !d.Armed() || s.Ammo <= 0 {
 				continue
 			}
 			wd := w.Cfg.W(d.Weapon)
@@ -385,7 +385,7 @@ func (b *Bot) evalWeapon(w *sim.World, wd *balance.Weapon, muzzle Vec, unit, str
 			if structID >= 0 {
 				ang = sim.ClampStructAim(ang)
 			}
-			hitPos, hu, hs := w.TraceRay(muzzle.Add(sim.Dir(ang).Mul(8)), ang, wd.Range, unit, structID)
+			hitPos, hu, hs := w.TraceRay(b.Pid, muzzle.Add(sim.Dir(ang).Mul(8)), ang, wd.Range, unit, structID)
 			_ = hitPos
 			var val float64
 			switch {
@@ -413,7 +413,7 @@ func (b *Bot) evalWeapon(w *sim.World, wd *balance.Weapon, muzzle Vec, unit, str
 		return b.evalBallistic(w, wd, muzzle, unit, structID, ts, k)
 	case balance.KindBallis, balance.KindMIRV, balance.KindAirstrike, balance.KindGeran:
 		return b.evalArea(w, wd, ts, k)
-	case balance.KindDrone:
+	case balance.KindDrone, balance.KindGuided:
 		t := ts[0]
 		d := t.pos.Sub(muzzle)
 		if d.Len() > wd.Speed*wd.Flight*0.8 {

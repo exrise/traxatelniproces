@@ -106,20 +106,23 @@ type Unit struct {
 
 // Struct is a placed building. Cells (CX,CY) is the top-left grid cell.
 type Struct struct {
-	ID     int
-	Owner  int
-	Def    string
-	CX, CY int
-	HP     float64
-	MaxHP  float64
-	Alive  bool
-	Ammo   int
-	AAAmmo int
-	Aim    float64
-	Fall   float64 // fall timer
-	Moving bool    // moved down recently (not settled)
-	Hurt   float64
-	Acted  bool
+	ID       int
+	Owner    int
+	Def      string
+	CX, CY   int
+	HP       float64
+	MaxHP    float64
+	Alive    bool
+	Ammo     int
+	AAAmmo   int
+	Aim      float64
+	Fall     float64 // fall timer
+	Moving   bool    // moved down recently (not settled)
+	Burst    int     // ticks left of an air-defence burst
+	BurstID  int
+	BurstPos Vec
+	Hurt     float64
+	Acted    bool
 }
 
 // ProjKind enumerates projectile behaviours.
@@ -161,6 +164,8 @@ type Proj struct {
 	Tried   []int   // ids of AA structures that already rolled against this
 	Armed   float64
 	Index   int
+	Doom    float64 // >0: shot down by air defence, dies when it reaches 0
+	DoomBy  int
 }
 
 // Spawn is a delayed projectile (salvo, bomb run).
@@ -211,4 +216,16 @@ type Event struct {
 	A, B int
 	F    float64
 	Text string
+}
+
+// QShot is one queued bullet of a burst.
+type QShot struct {
+	At           float64
+	From         Vec
+	Angle        float64
+	Weapon       string
+	Owner        int
+	Unit         int
+	IgnoreStruct int
+	K            float64
 }

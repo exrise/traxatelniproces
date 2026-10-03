@@ -262,7 +262,7 @@ func (b *BattleUI) Update(a *App) {
 			b.weapon = ""
 			return
 		}
-		if st := w.StructAtPx(wp.X, wp.Y); st != nil && st.Owner == me && w.Cfg.S(st.Def).Kind == balance.SWeapon && w.Stage == sim.StageActive {
+		if st := w.StructAtPx(wp.X, wp.Y); st != nil && st.Owner == me && w.Cfg.S(st.Def).Armed() && w.Stage == sim.StageActive {
 			send(sim.Command{Type: sim.CmdSelectStruct, ID: st.ID})
 			b.weapon = ""
 			return
@@ -473,7 +473,7 @@ func (b *BattleUI) updatePlan(a *App, me int) {
 			b.weapon = ""
 			return
 		}
-		if st := w.StructAtPx(wp.X, wp.Y); st != nil && st.Owner == me && w.Cfg.S(st.Def).Kind == balance.SWeapon {
+		if st := w.StructAtPx(wp.X, wp.Y); st != nil && st.Owner == me && w.Cfg.S(st.Def).Armed() {
 			b.planStruct = st.ID
 			b.weapon = ""
 			return
@@ -625,6 +625,9 @@ func (b *BattleUI) Draw(a *App, dst *ebiten.Image) {
 		if wd := w.Cfg.W(b.weapon); wd != nil && NeedsTarget(wd.Kind) && !sim3 {
 			b.fireBtn.Draw(a, dst)
 		}
+	}
+	if mine && b.droneAlive(me) {
+		a.TextCenter(dst, "Наводи мышью · ЛКМ / Пробел — подрыв", float64(ScreenW)/2, 84, 26, colGold, true)
 	}
 	if b.hintT > 0 {
 		a.TextCenter(dst, b.hint, ScreenW/2, ScreenH-210, 22, colGold, true)
@@ -857,7 +860,7 @@ func (b *BattleUI) drawTrajectory(a *App, dst *ebiten.Image, orig sim.Vec, ang f
 		vel.Y += g * wd.Gravity * sim.Dt
 		vel.X += w.Wind * wd.WindK * sim.Dt
 		pos = pos.Add(vel.Mul(sim.Dt))
-		if pos.Y > sim.WaterY || w.Terr.Solid(int(pos.X), int(pos.Y)) || w.StructAtPx(pos.X, pos.Y) != nil {
+		if pos.Y > sim.WaterY || w.Terr.Solid(int(pos.X), int(pos.Y)) || (w.StructAtPx(pos.X, pos.Y) != nil && !w.Passes(w.Cur, w.StructAtPx(pos.X, pos.Y))) {
 			sx, sy := cam.ToScreen(pos)
 			a.Circle(dst, sx, sy, 5, color.RGBA{255, 90, 70, 200})
 			return
@@ -948,7 +951,7 @@ func (b *BattleUI) cycleStruct(me int, dir int, send func(sim.Command)) {
 	w := b.m.w
 	var ids []int
 	for _, s := range w.StructsOf(me) {
-		if w.Cfg.S(s.Def).Kind == balance.SWeapon && s.Ammo > 0 {
+		if w.Cfg.S(s.Def).Armed() && s.Ammo > 0 {
 			ids = append(ids, s.ID)
 		}
 	}
@@ -983,7 +986,7 @@ func (b *BattleUI) squadRows(me int) []squadRow {
 		rows = append(rows, squadRow{isUnit: true, id: u.ID})
 	}
 	for _, s := range w.StructsOf(me) {
-		if w.Cfg.S(s.Def).Kind == balance.SWeapon {
+		if w.Cfg.S(s.Def).Armed() {
 			rows = append(rows, squadRow{id: s.ID})
 		}
 	}

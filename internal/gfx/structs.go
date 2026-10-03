@@ -92,6 +92,15 @@ func StructSprite(id string, w, h int) *image.RGBA {
 		for i := 0; i < 8; i++ {
 			c.Px(int(hash2(i, 1, 7)*float64(W)), int(hash2(i, 2, 7)*float64(H)), Shade(concreteC, 0.82))
 		}
+	case "window":
+		c.Rect(0, 0, W, H, concreteC)
+		c.Rect(0, 0, W, 2, Shade(concreteC, 1.2))
+		c.Rect(0, H-2, W, H, Shade(concreteC, 0.75))
+		c.Rect(4, 4, W-4, H-4, C(24, 28, 40))
+		c.Rect(6, 6, W-6, H-6, C(120, 190, 235))
+		c.Line(8, H-7, W/2-2, 6, C(215, 238, 252))
+		c.Line(W/2+6, H-7, W-9, 6, C(215, 238, 252))
+		c.Rect(W/2-1, 4, W/2+1, H-4, C(24, 28, 40))
 	case "armor":
 		c.Rect(0, 0, W, H, steelC)
 		c.Rect(1, 1, W-1, H-1, Shade(steelC, 1.15))

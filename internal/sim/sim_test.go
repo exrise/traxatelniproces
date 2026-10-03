@@ -396,3 +396,213 @@ func TestCanRunAfterShooting(t *testing.T) {
 		t.Fatalf("turn stuck: cur=%d stage=%d", w.Cur, w.Stage)
 	}
 }
+
+// TestTurnOrder: inside a battle players take turns in a fixed cycle with no
+// one playing twice in a row, and the first player changes between battles.
+func TestTurnOrder(t *testing.T) {
+	for n := 2; n <= 4; n++ {
+		w := newTest(n, uint64(10+n))
+		w.Cfg.RoundsPerBattle = 5
+		w.Cfg.AutoRounds = false
+		w.Cfg.SuddenDeathBattle = 0
+		for _, p := range w.Players {
+			mid := float64(p.ZoneX0+p.ZoneX1) / 2
+			w.PlaceUnit(p.ID, "assault", mid+60, 100)
+			w.SetReady(p.ID, true)
+		}
+		w.Step()
+		firsts := map[int]bool{}
+		for battle := 1; battle <= n; battle++ {
+			var seq []int
+			lastRound := 0
+			for tick := 0; tick < 60*60*10 && w.Phase == PhaseBattle && w.BattleNo == battle; tick++ {
+				if w.Stage == StageActive {
+					if len(seq) == 0 || seq[len(seq)-1] != w.Cur || w.Round != lastRound {
+						seq = append(seq, w.Cur)
+						lastRound = w.Round
+					}
+					w.Apply(Command{Player: w.Cur, Type: CmdEndTurn})
+				}
+				w.Step()
+			}
+			if len(seq) != n*5 {
+				t.Fatalf("n=%d battle %d: expected %d turns, got %d (%v)", n, battle, n*5, len(seq), seq)
+			}
+			for i := range seq {
+				if seq[i] != seq[i%n] {
+					t.Fatalf("n=%d battle %d: order is not a fixed cycle: %v", n, battle, seq)
+				}
+				if i > 0 && seq[i] == seq[i-1] {
+					t.Fatalf("n=%d battle %d: player %d moved twice in a row: %v", n, battle, seq[i], seq)
+				}
+			}
+			firsts[seq[0]] = true
+			// next build phase: everyone ready again
+			for _, p := range w.Players {
+				w.SetReady(p.ID, true)
+			}
+			w.Step()
+		}
+		if len(firsts) < n {
+			t.Fatalf("n=%d: the starting player did not rotate between battles (%v)", n, firsts)
+		}
+	}
+}
+
+// TestBurstIsABurstNotAShotgun: automatic weapons fire one bullet after another
+// along the aim line (tight group); only the shotgun spreads into a cone.
+func TestBurstIsABurstNotAShotgun(t *testing.T) {
+	w, _ := battleWith(t, "", "assault")
+	u := w.UnitsOf(0)[0]
+	w.Apply(Command{Player: 0, Type: CmdSelectUnit, ID: u.ID})
+	w.DrainEvents()
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "ak", Angle: 0, Power: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if len(w.Shots) != 7 {
+		t.Fatalf("expected 7 bullets queued behind the first one, got %d", len(w.Shots))
+	}
+	var ends []Vec
+	times := 0
+	for i := 0; i < 90; i++ {
+		w.Step()
+		n := 0
+		for _, e := range w.DrainEvents() {
+			if e.Type == EvTracer {
+				ends = append(ends, e.To)
+				n++
+			}
+		}
+		if n > 0 {
+			times++
+		}
+	}
+	if len(ends) != 8 {
+		t.Fatalf("expected 8 tracers, got %d", len(ends))
+	}
+	if times < 6 {
+		t.Fatalf("bullets must leave over several ticks, got %d distinct ticks", times)
+	}
+	minY, maxY := ends[0].Y, ends[0].Y
+	for _, e := range ends {
+		minY, maxY = math.Min(minY, e.Y), math.Max(maxY, e.Y)
+	}
+	dist := math.Abs(ends[0].X - u.Pos.X)
+	if dist > 100 && (maxY-minY)/dist > 0.04 {
+		t.Fatalf("group too wide for a burst: %.0f px over %.0f px", maxY-minY, dist)
+	}
+}
+
+func TestWindowIsTransparentOnlyForOwner(t *testing.T) {
+	w := newTest(2, 31)
+	w.BuildNo = 3
+	hq := w.Structs[w.Players[0].HQ]
+	cx := hq.CX + 14
+	cy := w.DropCell(cx, 2, 1, hq.CY-6)
+	if err := w.PlaceStruct(0, "window", cx, cy); err != nil {
+		t.Fatal(err)
+	}
+	win := w.Structs[len(w.Structs)-1]
+	c := w.StructCenter(win)
+	wd := w.Cfg.W("ak")
+	left := Vec{X: c.X - 80, Y: c.Y}
+	right := Vec{X: c.X + 40, Y: c.Y}
+	// the owner shoots through his window both ways
+	end, _, hs := w.TraceRay(0, left, 0, 200, -1, -1)
+	if hs != nil && hs.ID == win.ID {
+		t.Fatalf("owner's bullet was stopped by his own window (ended %v)", end)
+	}
+	// the enemy is stopped by it
+	_, _, hs = w.TraceRay(1, left, 0, 200, -1, -1)
+	if hs == nil || hs.ID != win.ID {
+		t.Fatalf("enemy bullet passed through a window")
+	}
+	_, _, hs = w.TraceRay(1, right, math.Pi, 200, -1, -1)
+	if hs == nil || hs.ID != win.ID {
+		t.Fatalf("enemy bullet from the other side passed through a window")
+	}
+	// shells too
+	if _, hit := w.PredictShell(Vec{X: left.X, Y: c.Y}, Vec{X: 600, Y: 0}, &balance.Weapon{Gravity: 0}, 1); !hit {
+		t.Fatalf("enemy shell should hit the window")
+	}
+	pos, _ := w.PredictShell(Vec{X: left.X, Y: c.Y}, Vec{X: 600, Y: 0}, &balance.Weapon{Gravity: 0}, 0)
+	if pos.X < c.X+10 {
+		t.Fatalf("owner's shell should fly through his window, stopped at %.0f (window at %.0f)", pos.X, c.X)
+	}
+	_ = wd
+}
+
+func TestKornetIsSteeredByThePlayer(t *testing.T) {
+	w, st := battleWith(t, "kornet")
+	enemy := w.Structs[w.Players[1].HQ]
+	before := enemy.HP
+	w.Apply(Command{Player: 0, Type: CmdSelectStruct, ID: st.ID})
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "kornet", Angle: -1.0, Power: 1}); err != nil {
+		t.Fatal(err)
+	}
+	var missile *Proj
+	for _, p := range w.Projs {
+		if p.Kind == PDrone && p.Phase == 1 {
+			missile = p
+		}
+	}
+	if missile == nil {
+		t.Fatal("no guided missile was launched")
+	}
+	startHeading := missile.Heading
+	for i := 0; i < 60*14; i++ {
+		for _, p := range w.Projs {
+			if p.Kind == PDrone && p.Alive {
+				tp := w.StructCenter(enemy)
+				if math.Abs(tp.X-p.Pos.X) > 250 {
+					tp.Y -= 700
+				}
+				d := tp.Sub(p.Pos)
+				w.Apply(Command{Player: 0, Type: CmdSteer, Angle: math.Atan2(d.Y, d.X)})
+			}
+		}
+		w.Step()
+	}
+	if math.Abs(missile.Heading-startHeading) < 0.2 {
+		t.Fatal("the missile ignored steering")
+	}
+	if enemy.HP >= before {
+		t.Fatalf("steered missile never hit the HQ")
+	}
+}
+
+func TestZUShootsVisiblyAndCanFireManually(t *testing.T) {
+	w, st := battleWith(t, "zu23")
+	// manual use: a ground burst
+	w.Apply(Command{Player: 0, Type: CmdSelectStruct, ID: st.ID})
+	if err := w.Apply(Command{Player: 0, Type: CmdFire, Weapon: "zu23gun", Angle: -0.2, Power: 1}); err != nil {
+		t.Fatalf("ZU-23 must be fireable by hand: %v", err)
+	}
+	if len(w.Shots) < 10 {
+		t.Fatalf("ZU burst should be a long stream of bullets, queued %d", len(w.Shots))
+	}
+	run(w, 3)
+	// automatic anti-air: tracers appear and the target dies a moment later, not instantly
+	w.Events = nil
+	w.Players[1].Items["fab"] = 1
+	w.Cur = 1
+	w.Stage = StageActive
+	w.TurnTimer = 1e9
+	w.launch(FireSpec{Player: 1, Unit: -1, Struct: -1, Weapon: "fab", TargetX: w.StructCenter(st).X})
+	tracers, intercepts := 0, 0
+	for i := 0; i < 60*8; i++ {
+		w.Step()
+		w.TurnTimer = 1e9
+		for _, e := range w.DrainEvents() {
+			if e.Type == EvTracer && e.F != 1 && e.F != 2 && e.F != 3 {
+				tracers++
+			}
+			if e.Type == EvIntercept {
+				intercepts++
+			}
+		}
+	}
+	if tracers < 3 {
+		t.Fatalf("the ZU-23 did not visibly shoot at the plane (tracers=%d, intercepts=%d)", tracers, intercepts)
+	}
+}

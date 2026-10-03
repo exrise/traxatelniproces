@@ -34,6 +34,7 @@ type World struct {
 	Structs []*Struct
 	Projs   []*Proj
 	Spawns  []Spawn
+	Shots   []QShot
 	Points  []*CapturePoint
 	Terr    *Terrain
 	Wind    float64
@@ -195,7 +196,7 @@ func (w *World) addStruct(owner int, def string, cx, cy int) *Struct {
 	if def == "hq" {
 		s.HP, s.MaxHP = w.Cfg.MaxHQHP, w.Cfg.MaxHQHP
 	}
-	if d.Kind == balance.SWeapon {
+	if d.Armed() {
 		if wd := w.Cfg.W(d.Weapon); wd != nil {
 			s.Ammo = wd.Ammo
 		}
@@ -406,3 +407,12 @@ func (w *World) RebuildOcc() {
 		}
 	}
 }
+
+// passes reports whether a shot of `owner` flies through structure s: windows
+// (бойницы) are transparent to their owner's team and solid for everybody else.
+func (w *World) passes(owner int, s *Struct) bool {
+	return w.Cfg.S(s.Def).Kind == balance.SWindow && !w.Hostile(owner, s.Owner)
+}
+
+// Passes is the exported form of passes for the UI (trajectory preview).
+func (w *World) Passes(owner int, s *Struct) bool { return w.passes(owner, s) }

@@ -165,7 +165,7 @@ func (w *World) Apply(c Command) error {
 			return ErrActed
 		}
 		if c.ID < 0 || c.ID >= len(w.Structs) || !w.Structs[c.ID].Alive || w.Structs[c.ID].Owner != pid ||
-			w.Cfg.S(w.Structs[c.ID].Def).Kind != balance.SWeapon {
+			!w.Cfg.S(w.Structs[c.ID].Def).Armed() {
 			return ErrUnknown
 		}
 		if w.Cfg.TurnMode == balance.TurnClassic && (w.UnitActed || w.StructActed) {
@@ -238,7 +238,7 @@ func (w *World) fireAction(pid int, c Command) error {
 	case w.SelStruct >= 0:
 		s := w.Structs[w.SelStruct]
 		d := w.Cfg.S(s.Def)
-		if !s.Alive || s.Owner != pid || d.Kind != balance.SWeapon || s.Ammo <= 0 {
+		if !s.Alive || s.Owner != pid || !d.Armed() || s.Ammo <= 0 {
 			return ErrAction
 		}
 		spec.Struct = s.ID

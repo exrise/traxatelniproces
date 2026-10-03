@@ -92,8 +92,12 @@ func (f *Effects) Handle(e sim.Event, w *sim.World, snd func(string, float64)) {
 		}
 	case sim.EvTracer:
 		col := color.RGBA{255, 240, 150, 255}
+		if e.F == 4 { // anti-air missile streak
+			f.add(particle{P: e.Pos, End: e.To, Life: 0.3, Col: color.RGBA{255, 190, 90, 255}, Kind: pLine, Size: 2.5})
+			break
+		}
 		f.add(particle{P: e.Pos, End: e.To, Life: 0.11, Col: col, Kind: pLine, Size: 1.5})
-		if e.F > 0 {
+		if e.F == 1 || e.F == 2 || e.F == 3 {
 			for i := 0; i < 3; i++ {
 				f.add(particle{P: e.To, V: sim.Vec{X: rnd(-80, 80), Y: rnd(-120, -10)}, Life: rnd(0.15, 0.4), Size: 2,
 					Col: color.RGBA{255, 220, 120, 255}, Kind: pSpark, Grav: 400})
@@ -101,7 +105,7 @@ func (f *Effects) Handle(e sim.Event, w *sim.World, snd func(string, float64)) {
 		}
 	case sim.EvShot:
 		f.add(particle{P: e.Pos, Life: 0.08, Size: 9, Col: color.RGBA{255, 230, 150, 255}, Kind: pFlash})
-		for i := 0; i < 3; i++ {
+		for i := 0; i < 3 && rand.Intn(2) == 0; i++ {
 			f.add(particle{P: e.Pos, V: sim.Vec{X: rnd(-20, 20), Y: rnd(-30, -5)}, Life: rnd(0.4, 0.9), Size: rnd(3, 6),
 				Col: color.RGBA{190, 190, 190, 160}, Kind: pSmoke})
 		}
@@ -192,7 +196,9 @@ func (f *Effects) Trail(p *sim.Proj) {
 			f.add(particle{P: p.Pos, Life: 0.3, Size: 1.5, Col: color.RGBA{220, 220, 220, 120}, Kind: pSmoke})
 		}
 	case sim.PDrone:
-		if rand.Intn(3) == 0 {
+		if p.Phase == 1 { // guided missile leaves a smoke trail
+			f.add(particle{P: p.Pos, V: sim.Vec{X: rnd(-8, 8), Y: rnd(-8, 8)}, Life: rnd(0.5, 0.9), Size: rnd(2, 3.5), Col: color.RGBA{215, 215, 215, 170}, Kind: pSmoke})
+		} else if rand.Intn(3) == 0 {
 			f.add(particle{P: p.Pos, Life: 0.3, Size: 1.5, Col: color.RGBA{200, 200, 200, 90}, Kind: pSmoke})
 		}
 	case sim.PPlane:

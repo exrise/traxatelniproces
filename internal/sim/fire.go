@@ -117,9 +117,27 @@ func (w *World) launch(sp FireSpec) error {
 		if shooter != nil {
 			su = shooter.ID
 		}
-		for i := 0; i < max(1, wd.Count); i++ {
-			a := angle + w.RNG.Range(-wd.Spread, wd.Spread)
-			w.rayShot(muzzle, a, wd, owner, k, su, ignoreStruct)
+		if wd.Kind == balance.KindBurst {
+			// a real burst: bullets leave one after another along the aim line
+			// with a small spread, the first one dead on target
+			n := max(1, wd.Count)
+			gap := math.Min(0.08, math.Max(0.025, 0.5/float64(n)))
+			for i := 0; i < n; i++ {
+				a := angle
+				if i > 0 {
+					a += w.RNG.Range(-wd.Spread, wd.Spread) * 0.5
+				}
+				if i == 0 {
+					w.rayShot(muzzle, a, wd, owner, k, su, ignoreStruct)
+				} else {
+					w.Shots = append(w.Shots, QShot{At: w.Time + float64(i)*gap, From: muzzle, Angle: a, Weapon: wd.ID, Owner: owner, Unit: su, IgnoreStruct: ignoreStruct, K: k})
+				}
+			}
+		} else {
+			for i := 0; i < max(1, wd.Count); i++ {
+				a := angle + w.RNG.Range(-wd.Spread, wd.Spread)
+				w.rayShot(muzzle, a, wd, owner, k, su, ignoreStruct)
+			}
 		}
 	case balance.KindShell:
 		w.newProj(Proj{Kind: PShell, Owner: owner, Weapon: wd.ID, Pos: muzzle, Vel: Dir(angle).Mul(wd.Speed * pw), Fuse: wd.Fuse, Class: wd.Class, Dmg: k})
@@ -136,8 +154,12 @@ func (w *World) launch(sp FireSpec) error {
 		tx := clamp(sp.TargetX, 20, float64(w.Terr.W-20))
 		gy := float64(w.Terr.SurfaceY(int(tx), 0))
 		w.newProj(Proj{Kind: PBallis, Owner: owner, Weapon: wd.ID, Pos: muzzle, Vel: Vec{0, -wd.Speed}, Target: Vec{tx, gy}, Class: balance.ClassNone, Dmg: k})
-	case balance.KindDrone:
-		w.newProj(Proj{Kind: PDrone, Owner: owner, Weapon: wd.ID, Pos: muzzle, Heading: angle, Steer: angle,
+	case balance.KindDrone, balance.KindGuided:
+		ph := 0
+		if wd.Kind == balance.KindGuided {
+			ph = 1 // guided missile: same steering as a drone, drawn as a missile
+		}
+		w.newProj(Proj{Kind: PDrone, Owner: owner, Weapon: wd.ID, Pos: muzzle, Heading: angle, Steer: angle, Phase: ph,
 			Vel: Dir(angle).Mul(wd.Speed), Flight: wd.Flight, Class: wd.Class, Dmg: k})
 	case balance.KindGeran:
 		tx := clamp(sp.TargetX, 20, float64(w.Terr.W-20))
@@ -242,7 +264,7 @@ func (w *World) rayShot(from Vec, ang float64, wd *balance.Weapon, owner int, k 
 				return
 			}
 		}
-		if s := w.StructAtPx(p.X, p.Y); s != nil && s.ID != ignoreStruct {
+		if s := w.StructAtPx(p.X, p.Y); s != nil && s.ID != ignoreStruct && !w.passes(owner, s) {
 			def := w.Cfg.S(s.Def)
 			bm := wd.BlockMul
 			if bm == 0 {

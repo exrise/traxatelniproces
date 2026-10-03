@@ -199,7 +199,7 @@ func blip(f0, f1, dur float64) []float64 {
 func kindFor(name string) string {
 	id := strings.TrimPrefix(name, "shot_")
 	switch id {
-	case "ak", "dshk":
+	case "ak", "dshk", "zu23gun":
 		return "shot_rifle"
 	case "makarov":
 		return "shot_pistol"
@@ -207,7 +207,7 @@ func kindFor(name string) string {
 		return "shot_shotgun"
 	case "svd":
 		return "shot_sniper"
-	case "rpg", "kornet", "grad", "fpv", "iskander", "oreshnik", "geran":
+	case "rpg", "kornet", "grad", "fpv", "iskander", "oreshnik", "geran", "aamissile":
 		return "shot_whoosh"
 	case "mortar", "grenade":
 		return "shot_mortar"

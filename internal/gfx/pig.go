@@ -148,3 +148,22 @@ func Tint(src *image.RGBA, col color.RGBA, amount float64) *image.RGBA {
 	}
 	return out
 }
+
+// Icon renders a pig head image of the given size for the window icon.
+func Icon(size int) *image.RGBA {
+	src := PigSprite(1, "assault", 0)
+	out := image.NewRGBA(image.Rect(0, 0, size, size))
+	// crop the head region of the sprite (x 4..22, y 0..14) and scale it to fill the icon
+	cx0, cy0, cw, ch := 2, 0, 20, 14
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			sx := cx0 + x*cw/size
+			sy := cy0 + y*ch/size
+			if sy < 0 || sx < 0 {
+				continue
+			}
+			out.SetRGBA(x, y, src.RGBAAt(sx, sy))
+		}
+	}
+	return out
+}

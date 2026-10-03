@@ -1,4 +1,5 @@
 *.exe
+!release/*.exe
 /dist/
 /presets/
 *.test

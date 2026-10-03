@@ -571,7 +571,13 @@ func (b *BattleUI) autoCamera(a *App, me int) {
 		follow = p
 	}
 	if follow != nil {
-		cam.CenterOn(follow.Pos, 0.10)
+		tp := follow.Pos
+		// keep the ground in view when a projectile arcs high
+		gx := int(math.Max(0, math.Min(float64(w.Terr.W-1), tp.X)))
+		if minY := float64(w.Terr.SurfaceY(gx, 0)) - 330/cam.Zoom - 120; tp.Y < minY {
+			tp.Y = minY
+		}
+		cam.CenterOn(tp, 0.10)
 		b.holdT = 1.0
 		return
 	}
@@ -709,7 +715,11 @@ func (b *BattleUI) drawPlayers(a *App, dst *ebiten.Image) {
 		if p.Elim {
 			nc = colDim
 		}
-		a.Text(dst, p.Name, x+24, yy, 18, nc)
+		name := p.Name
+		if w.Cfg.TeamsEnabled {
+			name = fmt.Sprintf("[%c] %s", 'A'+p.Team%2, p.Name)
+		}
+		a.Text(dst, name, x+24, yy, 18, nc)
 		a.TextB(dst, fmt.Sprintf("$%d", p.Money), x+150, yy, 18, colGold)
 		if p.Elim {
 			a.Text(dst, "выбыл", x+222, yy, 16, colBad)

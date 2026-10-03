@@ -21,39 +21,41 @@ type wopt struct {
 
 // BattleUI is the battle-phase interface.
 type BattleUI struct {
-	m         *Match
-	weapon    string
-	charging  bool
-	charge    float64
-	targetX   float64
-	hasTarget bool
-	walkDir   int
-	planWalk  float64
-	camManual float64
-	dragging  bool
-	dragX     int
-	dragY     int
-	dragCamX  float64
-	dragCamY  float64
-	moved     bool
-	showTraj  bool
-	endBtn    *Button
-	fireBtn   *Button
-	opts      []wopt
-	turnKey   int
-	focusT    float64
-	holdT     float64
-	lastAim   float64
-	mini      *ebiten.Image
-	miniAt    int
-	hint      string
-	hintT     int
-	planned   bool
+	m          *Match
+	weapon     string
+	charging   bool
+	charge     float64
+	targetX    float64
+	hasTarget  bool
+	walkDir    int
+	planWalk   float64
+	camManual  float64
+	dragging   bool
+	dragX      int
+	dragY      int
+	dragCamX   float64
+	dragCamY   float64
+	moved      bool
+	showTraj   bool
+	endBtn     *Button
+	fireBtn    *Button
+	opts       []wopt
+	turnKey    int
+	focusT     float64
+	holdT      float64
+	lastAim    float64
+	mini       *ebiten.Image
+	miniAt     int
+	hint       string
+	hintT      int
+	planned    bool
+	planUnit   int
+	planStruct int
 }
 
 // NewBattleUI creates the battle interface.
 func NewBattleUI(m *Match) *BattleUI {
-	b := &BattleUI{m: m, showTraj: true, turnKey: -1}
+	b := &BattleUI{m: m, showTraj: true, turnKey: -1, planUnit: -1, planStruct: -1}
 	b.endBtn = NewButton(ScreenW-290, ScreenH-168, 270, 44, "Закончить ход (E)")
 	b.endBtn.Size = 18
 	b.fireBtn = NewButton(ScreenW/2-110, ScreenH-168, 220, 46, "ОГОНЬ! (Пробел)")
@@ -83,11 +85,15 @@ func (b *BattleUI) origin(u *sim.Unit, s *sim.Struct) sim.Vec {
 
 func (b *BattleUI) actors() (*sim.Unit, *sim.Struct) {
 	w := b.m.w
-	if w.SelStruct >= 0 && w.Structs[w.SelStruct].Alive {
-		return nil, w.Structs[w.SelStruct]
+	su, ss := w.SelUnit, w.SelStruct
+	if w.Cfg.TurnMode == balance.TurnSimultaneous {
+		su, ss = b.planUnit, b.planStruct
 	}
-	if w.SelUnit >= 0 && w.Units[w.SelUnit].Alive {
-		return w.Units[w.SelUnit], nil
+	if ss >= 0 && ss < len(w.Structs) && w.Structs[ss].Alive {
+		return nil, w.Structs[ss]
+	}
+	if su >= 0 && su < len(w.Units) && w.Units[su].Alive {
+		return w.Units[su], nil
 	}
 	return nil, nil
 }
@@ -462,23 +468,25 @@ func (b *BattleUI) updatePlan(a *App, me int) {
 	if w.Stage != sim.StagePlan {
 		return
 	}
-	pl := w.Plans[me]
-	if w.SelUnit < 0 || !w.Units[w.SelUnit].Alive || w.Units[w.SelUnit].Owner != me {
+
+	if b.planUnit < 0 && b.planStruct < 0 || (b.planUnit >= 0 && (!w.Units[b.planUnit].Alive || w.Units[b.planUnit].Owner != me)) {
+		b.planStruct = -1
+		b.planUnit = -1
 		if us := w.UnitsOf(me); len(us) > 0 {
-			w.SelUnit = us[0].ID
+			b.planUnit = us[0].ID
 		}
 	}
 	b.buildOpts(me)
-	m.view.SelUnit, m.view.SelStruct = w.SelUnit, w.SelStruct
+	m.view.SelUnit, m.view.SelStruct = b.planUnit, b.planStruct
 	if a.Click && !b.overUI(a) && !b.charging {
 		wp := cam.ToWorld(float64(a.MX), float64(a.MY))
 		if cu := b.unitAt(me, wp); cu != nil {
-			w.SelUnit, w.SelStruct = cu.ID, -1
+			b.planUnit, b.planStruct = cu.ID, -1
 			b.weapon = ""
 			return
 		}
 		if st := w.StructAtPx(wp.X, wp.Y); st != nil && st.Owner == me && w.Cfg.S(st.Def).Kind == balance.SWeapon {
-			w.SelStruct = st.ID
+			b.planStruct = st.ID
 			b.weapon = ""
 			return
 		}
@@ -539,7 +547,7 @@ func (b *BattleUI) updatePlan(a *App, me int) {
 			commit(1)
 		}
 	}
-	_ = pl
+
 }
 
 func (b *BattleUI) autoCamera(a *App, me int) {

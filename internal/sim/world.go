@@ -390,3 +390,16 @@ func (w *World) CountWalls(owner int) int {
 
 // DropCell is the exported cell-drop helper used by builders and the UI.
 func (w *World) DropCell(cx, cw, ch, from int) int { return w.dropCell(cx, cw, ch, from) }
+
+// RebuildOcc recomputes the structure occupancy grid from the structure list
+// (used by network clients after replacing the list from a snapshot).
+func (w *World) RebuildOcc() {
+	for i := range w.occ {
+		w.occ[i] = 0
+	}
+	for _, s := range w.Structs {
+		if s != nil && s.Alive {
+			w.setOcc(s, int32(s.ID+1))
+		}
+	}
+}

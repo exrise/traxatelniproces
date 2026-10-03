@@ -227,9 +227,10 @@ func GenerateTerrain(n int, seed uint64) (*Terrain, []Vec) {
 	// small caves under the gaps give some tactical variety
 	for i := 0; i < n-1; i++ {
 		z1 := MapMargin + ZoneStep*i + ZoneW
-		cx := z1 + (ZoneStep-ZoneW)/2 + int(rng.Range(-60, 60))
-		cy := PlateauY + int(rng.Range(60, 110))
-		t.Carve(cx, cy, int(rng.Range(30, 48)), false)
+		mid := z1 + (ZoneStep-ZoneW)/2
+		cx := mid + int(rng.Range(100, 200))*(1-2*rng.Intn(2))
+		cy := t.SurfaceY(cx, 0) + int(rng.Range(40, 75))
+		t.Carve(cx, cy, int(rng.Range(24, 36)), false)
 	}
 	// capture points in the middle of every gap, standing on the ground
 	var pts []Vec
